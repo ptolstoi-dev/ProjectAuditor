@@ -19,23 +19,87 @@ public class AuditorEngine
 
     private static readonly HttpClient _httpClient = new HttpClient();
 
+    /// <summary>
+    /// Event für Progress-Rückmeldungen bei Scan und Upgrade
+    /// </summary>
+    public event Action<ProgressUpdate>? OnProgress;
+
+    /// <summary>
+    /// Hilfsmethode um Progress zu melden
+    /// </summary>
+    private void RaiseProgress(ProgressUpdate update)
+    {
+        OnProgress?.Invoke(update);
+        _logger?.LogInformation($"[{update.Stage}] {update.Message}");
+    }
+
     public async Task<List<PackageUpgradeModel>> GetUpgradablePackagesAsync(string path)
     {
         _logger?.LogInformation($"Scanning for upgradable packages in {path}");
 
         var results = new Dictionary<string, PackageUpgradeModel>();
 
-        // 1. Get Vulnerable packages
-        var vulnerableResponse = await _cliService.ListPackagesAsync(path, "vulnerable");
-        await ProcessResponseAsync(vulnerableResponse, results, "Vulnerable");
+        try
+        {
+            // 1. Get Vulnerable packages
+            RaiseProgress(new ProgressUpdate
+            {
+                Stage = ProgressStage.ScanningVulnerable,
+                Message = "Scanning for vulnerable packages...",
+                PercentComplete = 10
+            });
+            var vulnerableResponse = await _cliService.ListPackagesAsync(path, "vulnerable");
+            await ProcessResponseAsync(vulnerableResponse, results, "Vulnerable");
 
-        // 2. Get Outdated packages
-        var outdatedResponse = await _cliService.ListPackagesAsync(path, "outdated");
-        await ProcessResponseAsync(outdatedResponse, results, "Outdated");
+            // 2. Get Outdated packages
+            RaiseProgress(new ProgressUpdate
+            {
+                Stage = ProgressStage.ScanningOutdated,
+                Message = "Scanning for outdated packages...",
+                PercentComplete = 30
+            });
+            var outdatedResponse = await _cliService.ListPackagesAsync(path, "outdated");
+            await ProcessResponseAsync(outdatedResponse, results, "Outdated");
 
-        // 3. Get Deprecated packages
-        var deprecatedResponse = await _cliService.ListPackagesAsync(path, "deprecated");
-        await ProcessResponseAsync(deprecatedResponse, results, "Deprecated");
+            // 3. Get Deprecated packages
+            RaiseProgress(new ProgressUpdate
+            {
+                Stage = ProgressStage.ScanningDeprecated,
+                Message = "Scanning for deprecated packages...",
+                PercentComplete = 50
+            });
+            var deprecatedResponse = await _cliService.ListPackagesAsync(path, "deprecated");
+            await ProcessResponseAsync(deprecatedResponse, results, "Deprecated");
+
+            // 4. Fetch versions for all packages
+            int totalPackages = results.Count;
+            int currentPackageIndex = 0;
+            foreach (var package in results.Values)
+            {
+                currentPackageIndex++;
+                int percent = 50 + (int)((double)currentPackageIndex / totalPackages * 40);
+                RaiseProgress(new ProgressUpdate
+                {
+                    Stage = ProgressStage.FetchingVersions,
+                    CurrentPackage = package.PackageId,
+                    Message = $"Fetching versions for {package.PackageId} ({currentPackageIndex}/{totalPackages})...",
+                    PercentComplete = percent
+                });
+                // Versions already fetched in ProcessResponse, but this provides feedback
+            }
+
+            RaiseProgress(new ProgressUpdate
+            {
+                Stage = ProgressStage.Complete,
+                Message = $"Scan completed. Found {totalPackages} packages requiring updates.",
+                PercentComplete = 100
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError($"Error during scan: {ex.Message}");
+            throw;
+        }
 
         return results.Values.ToList();
     }
@@ -220,33 +284,90 @@ public class AuditorEngine
         var cpmPath = Path.Combine(basePath, "Directory.Packages.props");
         var usesCpm = File.Exists(cpmPath);
 
+        // Count total upgrades needed
+        int totalUpgrades = 0;
         foreach (var pkg in packagesToUpgrade)
         {
             if (string.IsNullOrEmpty(pkg.SelectedVersion) || pkg.SelectedVersion == pkg.CurrentVersion)
-            {
-                continue; // Skip if no upgrade selected
-            }
+                continue;
 
-            // Get selected projects
             var selectedProjects = pkg.Projects.Where(p => p.IsSelectedForUpgrade).ToList();
-            if (!selectedProjects.Any()) continue;
-
-            // Apply updates
             if (usesCpm)
-            {
-                // If using CPM, we update the central props file once
-                _logger?.LogInformation($"Updating CPM for {pkg.PackageId} to {pkg.SelectedVersion}");
-                await TryUpdateAndVerifyAsync(cpmPath, pkg.PackageId, pkg.CurrentVersion, pkg.SelectedVersion);
-            }
+                totalUpgrades += 1; // CPM: one update per package
             else
+                totalUpgrades += selectedProjects.Count; // Individual: one update per project
+        }
+
+        int currentUpgradeIndex = 0;
+
+        try
+        {
+            RaiseProgress(new ProgressUpdate
             {
-                // Otherwise, update each selected project individually
-                foreach (var proj in selectedProjects)
+                Stage = ProgressStage.ApplyingUpdates,
+                Message = $"Starting to apply {totalUpgrades} upgrades...",
+                PercentComplete = 0
+            });
+
+            foreach (var pkg in packagesToUpgrade)
+            {
+                if (string.IsNullOrEmpty(pkg.SelectedVersion) || pkg.SelectedVersion == pkg.CurrentVersion)
                 {
-                    _logger?.LogInformation($"Updating Project {proj.ProjectName} for {pkg.PackageId} to {pkg.SelectedVersion}");
-                    await TryUpdateAndVerifyAsync(proj.ProjectPath, pkg.PackageId, pkg.CurrentVersion, pkg.SelectedVersion);
+                    continue; // Skip if no upgrade selected
+                }
+
+                // Get selected projects
+                var selectedProjects = pkg.Projects.Where(p => p.IsSelectedForUpgrade).ToList();
+                if (!selectedProjects.Any()) continue;
+
+                // Apply updates
+                if (usesCpm)
+                {
+                    // If using CPM, we update the central props file once
+                    currentUpgradeIndex++;
+                    int percent = (int)((double)currentUpgradeIndex / totalUpgrades * 90);
+                    RaiseProgress(new ProgressUpdate
+                    {
+                        Stage = ProgressStage.ApplyingUpdates,
+                        CurrentPackage = pkg.PackageId,
+                        Message = $"Applying upgrade: {pkg.PackageId} {pkg.CurrentVersion} → {pkg.SelectedVersion} (CPM) ({currentUpgradeIndex}/{totalUpgrades})",
+                        PercentComplete = percent
+                    });
+                    _logger?.LogInformation($"Updating CPM for {pkg.PackageId} to {pkg.SelectedVersion}");
+                    await TryUpdateAndVerifyAsync(cpmPath, pkg.PackageId, pkg.CurrentVersion, pkg.SelectedVersion);
+                }
+                else
+                {
+                    // Otherwise, update each selected project individually
+                    foreach (var proj in selectedProjects)
+                    {
+                        currentUpgradeIndex++;
+                        int percent = (int)((double)currentUpgradeIndex / totalUpgrades * 90);
+                        RaiseProgress(new ProgressUpdate
+                        {
+                            Stage = ProgressStage.ApplyingUpdates,
+                            CurrentPackage = pkg.PackageId,
+                            CurrentProject = proj.ProjectName,
+                            Message = $"Applying upgrade: {pkg.PackageId} {pkg.CurrentVersion} → {pkg.SelectedVersion} in {proj.ProjectName} ({currentUpgradeIndex}/{totalUpgrades})",
+                            PercentComplete = percent
+                        });
+                        _logger?.LogInformation($"Updating Project {proj.ProjectName} for {pkg.PackageId} to {pkg.SelectedVersion}");
+                        await TryUpdateAndVerifyAsync(proj.ProjectPath, pkg.PackageId, pkg.CurrentVersion, pkg.SelectedVersion);
+                    }
                 }
             }
+
+            RaiseProgress(new ProgressUpdate
+            {
+                Stage = ProgressStage.Complete,
+                Message = "All upgrades completed successfully!",
+                PercentComplete = 100
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError($"Error during upgrade: {ex.Message}");
+            throw;
         }
     }
 
@@ -254,25 +375,61 @@ public class AuditorEngine
     {
         if (oldVersion == null || newVersion == "Unknown") return;
 
-        // Apply update
-        _projectParser.UpdatePackageVersion(projectOrPropsPath, packageId, newVersion);
-
-        // Verify build
-        var buildDir = Path.GetDirectoryName(projectOrPropsPath) ?? string.Empty;
-        var success = await _cliService.BuildAsync(buildDir);
-
-        if (success)
+        try
         {
-            _logger?.LogInformation($"Success: {packageId} updated to {newVersion}.");
-            await SaveAuditLogAsync(projectOrPropsPath, packageId, oldVersion, newVersion);
+            // Apply update
+            RaiseProgress(new ProgressUpdate
+            {
+                Stage = ProgressStage.ApplyingUpdates,
+                CurrentPackage = packageId,
+                Message = $"Updating {packageId} to {newVersion}...",
+                PercentComplete = -1 // Indeterminate
+            });
+            _projectParser.UpdatePackageVersion(projectOrPropsPath, packageId, newVersion);
+
+            // Verify build
+            RaiseProgress(new ProgressUpdate
+            {
+                Stage = ProgressStage.Verifying,
+                CurrentPackage = packageId,
+                Message = $"Verifying build for {packageId}...",
+                PercentComplete = -1 // Indeterminate
+            });
+            var buildDir = Path.GetDirectoryName(projectOrPropsPath) ?? string.Empty;
+            var success = await _cliService.BuildAsync(buildDir);
+
+            if (success)
+            {
+                _logger?.LogInformation($"Success: {packageId} updated to {newVersion}.");
+                RaiseProgress(new ProgressUpdate
+                {
+                    Stage = ProgressStage.Verifying,
+                    CurrentPackage = packageId,
+                    Message = $"✓ Build verified for {packageId} {newVersion}",
+                    PercentComplete = -1
+                });
+                await SaveAuditLogAsync(projectOrPropsPath, packageId, oldVersion, newVersion);
+            }
+            else
+            {
+                _logger?.LogWarning($"Build failed after updating {packageId}. Rolling back to {oldVersion}.");
+                RaiseProgress(new ProgressUpdate
+                {
+                    Stage = ProgressStage.Verifying,
+                    CurrentPackage = packageId,
+                    Message = $"Build failed for {packageId}. Rolling back to {oldVersion}...",
+                    PercentComplete = -1
+                });
+                // Rollback
+                _projectParser.UpdatePackageVersion(projectOrPropsPath, packageId, oldVersion);
+                // Verify rollback
+                await _cliService.BuildAsync(buildDir);
+            }
         }
-        else
+        catch (Exception ex)
         {
-            _logger?.LogWarning($"Build failed after updating {packageId}. Rolling back to {oldVersion}.");
-            // Rollback
-            _projectParser.UpdatePackageVersion(projectOrPropsPath, packageId, oldVersion);
-            // Verify rollback
-            await _cliService.BuildAsync(buildDir);
+            _logger?.LogError($"Error updating {packageId}: {ex.Message}");
+            throw;
         }
     }
 

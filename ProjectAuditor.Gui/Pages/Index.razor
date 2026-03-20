@@ -1,6 +1,7 @@
 @page "/"
 @using ProjectAuditor.Core.Services
 @using ProjectAuditor.Core.Models
+@using System.Diagnostics
 @inject DotNetCliService CliService
 @inject AuditorEngine Engine
 
@@ -19,7 +20,10 @@
             <h5 class="card-title">Projektverzeichnis</h5>
             <div class="input-group mb-3">
                 <input type="text" class="form-control form-control-lg" @bind="targetPath" placeholder="C:\Pfad\zur\Solution" />
-                <button class="btn btn-primary btn-lg" @onclick="ScanDirectory" disabled="@isScanning">
+                <button class="btn btn-secondary btn-lg" @onclick="OpenFolderInExplorer" title="Open in Explorer">
+                    <span>📁 Im Explorer öffnen</span>
+                </button>
+                <button class="btn btn-primary btn-lg ml-3" @onclick="ScanDirectory" disabled="@isScanning">
                     @if (isScanning)
                     {
                         <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
@@ -35,6 +39,41 @@
             @if (errorMessage != null)
             {
                 <div class="alert alert-danger">@errorMessage</div>
+            }
+
+            @if (currentProgress != null && (isScanning || isFixing))
+            {
+                <div class="alert alert-info mt-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <span class="badge @GetProgressStageBadgeClass(currentProgress.Stage) me-2">@GetProgressStageText(currentProgress.Stage)</span>
+                            <span class="fw-bold">@currentProgress.Message</span>
+                        </div>
+                        <span class="text-muted small">@currentProgress.PercentComplete%</span>
+                    </div>
+                    @if (currentProgress.CurrentPackage != null)
+                    {
+                        <div class="small text-muted mb-2">
+                            📦 Paket: <code>@currentProgress.CurrentPackage</code>
+                            @if (!string.IsNullOrEmpty(currentProgress.CurrentProject))
+                            {
+                                <span>| 📂 Projekt: <code>@currentProgress.CurrentProject</code></span>
+                            }
+                        </div>
+                    }
+                    @if (currentProgress.PercentComplete >= 0)
+                    {
+                        <div class="progress" style="height: 20px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: @currentProgress.PercentComplete%" aria-valuenow="@currentProgress.PercentComplete" aria-valuemin="0" aria-valuemax="100">@currentProgress.PercentComplete%</div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="progress" style="height: 20px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                    }
+                </div>
             }
         </div>
     </div>
@@ -151,12 +190,105 @@
 </div>
 
 @code {
-    private string targetPath = @"c:\PAT\projekte\_portfolio\github\ProjectAuditor";
+    private string targetPath = string.Empty;
     private bool isScanning;
     private bool isFixing;
     private bool fixComplete;
     private string? errorMessage;
     private List<PackageUpgradeModel>? upgradablePackages;
+    private ProgressUpdate? currentProgress;
+
+    /// <summary>
+    /// Initialize with current working directory
+    /// </summary>
+    protected override void OnInitialized()
+    {
+        // Set initial path to current working directory if empty
+        if (string.IsNullOrEmpty(targetPath))
+        {
+            targetPath = Directory.GetCurrentDirectory();
+        }
+        base.OnInitialized();
+    }
+
+    /// <summary>
+    /// Event handler for progress updates from AuditorEngine
+    /// Must use InvokeAsync because event is triggered from background thread
+    /// </summary>
+    private void OnProgressChanged(ProgressUpdate update)
+    {
+        // Fire-and-forget async to avoid blocking
+        _ = InvokeAsync(async () =>
+        {
+            currentProgress = update;
+            await InvokeAsync(StateHasChanged);
+        });
+    }
+
+    /// <summary>
+    /// Open current folder in Windows Explorer
+    /// </summary>
+    private void OpenFolderInExplorer()
+    {
+        try
+        {
+            // Validate path exists
+            if (string.IsNullOrEmpty(targetPath) || !Directory.Exists(targetPath))
+            {
+                errorMessage = "Das eingegebene Verzeichnis existiert nicht.";
+                return;
+            }
+
+            // Open the folder in Windows Explorer
+            var processInfo = new ProcessStartInfo()
+            {
+                FileName = "explorer.exe",
+                Arguments = $"/select,\"{targetPath}\"",
+                UseShellExecute = true
+            };
+            Process.Start(processInfo);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Fehler beim Öffnen des Explorers: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Get the badge CSS class for a progress stage
+    /// </summary>
+    private string GetProgressStageBadgeClass(ProgressStage stage)
+    {
+        return stage switch
+        {
+            ProgressStage.ScanningVulnerable => "bg-danger",
+            ProgressStage.ScanningOutdated => "bg-warning text-dark",
+            ProgressStage.ScanningDeprecated => "bg-warning text-dark",
+            ProgressStage.FetchingVersions => "bg-info",
+            ProgressStage.ApplyingUpdates => "bg-primary",
+            ProgressStage.Verifying => "bg-secondary",
+            ProgressStage.Complete => "bg-success",
+            _ => "bg-secondary"
+        };
+    }
+
+    /// <summary>
+    /// Get human-readable text for a progress stage
+    /// </summary>
+    private string GetProgressStageText(ProgressStage stage)
+    {
+        return stage switch
+        {
+            ProgressStage.ScanningVulnerable => "🔴 Scanning Vulnerable",
+            ProgressStage.ScanningOutdated => "🟡 Scanning Outdated",
+            ProgressStage.ScanningDeprecated => "🟡 Scanning Deprecated",
+            ProgressStage.FetchingVersions => "🔵 Fetching Versions",
+            ProgressStage.ApplyingUpdates => "🔧 Applying Updates",
+            ProgressStage.Verifying => "⚙️ Verifying",
+            ProgressStage.Complete => "✅ Complete",
+            _ => "🔄 Processing"
+        };
+    }
 
     private async Task ScanDirectory()
     {
@@ -166,7 +298,11 @@
             errorMessage = null;
             fixComplete = false;
             upgradablePackages = null;
+            currentProgress = null;
             StateHasChanged();
+
+            // Subscribe to progress updates
+            Engine.OnProgress += OnProgressChanged;
 
             upgradablePackages = await Task.Run(() => Engine.GetUpgradablePackagesAsync(targetPath));
         }
@@ -176,6 +312,8 @@
         }
         finally
         {
+            // Unsubscribe from progress updates
+            Engine.OnProgress -= OnProgressChanged;
             isScanning = false;
             StateHasChanged();
         }
@@ -190,7 +328,11 @@
             isFixing = true;
             errorMessage = null;
             fixComplete = false;
+            currentProgress = null;
             StateHasChanged();
+
+            // Subscribe to progress updates
+            Engine.OnProgress += OnProgressChanged;
 
             await Task.Run(() => Engine.ApplyUpgradesAsync(targetPath, upgradablePackages));
 
@@ -205,6 +347,8 @@
         }
         finally
         {
+            // Unsubscribe from progress updates
+            Engine.OnProgress -= OnProgressChanged;
             isFixing = false;
             StateHasChanged();
         }
