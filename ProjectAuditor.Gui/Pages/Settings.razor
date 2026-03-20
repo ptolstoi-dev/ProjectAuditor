@@ -1,0 +1,76 @@
+@page "/settings"
+@using ProjectAuditor.Core.Models
+@using ProjectAuditor.Core.Services
+@inject ISettingsService SettingsService
+
+<h1>Einstellungen</h1>
+
+<div class="card mt-4">
+    <div class="card-body">
+        <h5 class="card-title">NuGet Audit Konfiguration</h5>
+        
+        @if (settings == null)
+        {
+            <p><em>Lade Einstellungen...</em></p>
+        }
+        else
+        {
+            <div class="form-group mb-3">
+                <label for="auditMode">Audit Modus</label>
+                <select id="auditMode" class="form-select" @bind="settings.AuditMode">
+                    @foreach (var mode in Enum.GetValues<NuGetAuditMode>())
+                    {
+                        <option value="@mode">@mode</option>
+                    }
+                </select>
+                <small class="form-text text-muted">
+                    Direct: Prüft nur direkte Paketreferenzen.<br />
+                    All: Prüft direkte und alle transitiven Paketreferenzen.
+                </small>
+            </div>
+
+            <div class="form-group mb-4">
+                <label for="auditLevel">Audit Level (Schweregrad)</label>
+                <select id="auditLevel" class="form-select" @bind="settings.AuditLevel">
+                    @foreach (var level in Enum.GetValues<NuGetAuditLevel>())
+                    {
+                        <option value="@level">@level</option>
+                    }
+                </select>
+                <small class="form-text text-muted">
+                    Definiert ab welchem Schweregrad Schwachstellen gemeldet werden.
+                </small>
+            </div>
+
+            <button class="btn btn-primary" @onclick="SaveSettings">Speichern</button>
+            
+            @if (showSuccessMessage)
+            {
+                <span class="text-success ms-3">Einstellungen erfolgreich gespeichert!</span>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    private ProjectAuditorSettings settings = null!;
+    private bool showSuccessMessage = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        settings = await SettingsService.LoadSettingsAsync();
+    }
+
+    private async Task SaveSettings()
+    {
+        await SettingsService.SaveSettingsAsync(settings);
+        showSuccessMessage = true;
+        
+        // Hide message after 3 seconds
+        _ = Task.Delay(3000).ContinueWith(_ => 
+        {
+            showSuccessMessage = false;
+            InvokeAsync(StateHasChanged);
+        });
+    }
+}
