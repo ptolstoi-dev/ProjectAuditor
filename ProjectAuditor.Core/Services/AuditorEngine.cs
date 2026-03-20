@@ -334,7 +334,16 @@ public class AuditorEngine
                         PercentComplete = percent
                     });
                     _logger?.LogInformation($"Updating CPM for {pkg.PackageId} to {pkg.SelectedVersion}");
-                    await TryUpdateAndVerifyAsync(cpmPath, pkg.PackageId, pkg.CurrentVersion, pkg.SelectedVersion);
+                    await TryUpdateAndVerifyAsync(cpmPath, pkg.PackageId, pkg.CurrentVersion, pkg.SelectedVersion, percent);
+                    
+                    // Update progress after verification
+                    RaiseProgress(new ProgressUpdate
+                    {
+                        Stage = ProgressStage.ApplyingUpdates,
+                        CurrentPackage = pkg.PackageId,
+                        Message = $"✓ Completed: {pkg.PackageId} {pkg.CurrentVersion} → {pkg.SelectedVersion}",
+                        PercentComplete = percent
+                    });
                 }
                 else
                 {
@@ -352,7 +361,17 @@ public class AuditorEngine
                             PercentComplete = percent
                         });
                         _logger?.LogInformation($"Updating Project {proj.ProjectName} for {pkg.PackageId} to {pkg.SelectedVersion}");
-                        await TryUpdateAndVerifyAsync(proj.ProjectPath, pkg.PackageId, pkg.CurrentVersion, pkg.SelectedVersion);
+                        await TryUpdateAndVerifyAsync(proj.ProjectPath, pkg.PackageId, pkg.CurrentVersion, pkg.SelectedVersion, percent);
+                        
+                        // Update progress after verification
+                        RaiseProgress(new ProgressUpdate
+                        {
+                            Stage = ProgressStage.ApplyingUpdates,
+                            CurrentPackage = pkg.PackageId,
+                            CurrentProject = proj.ProjectName,
+                            Message = $"✓ Completed: {pkg.PackageId} {pkg.CurrentVersion} → {pkg.SelectedVersion} in {proj.ProjectName}",
+                            PercentComplete = percent
+                        });
                     }
                 }
             }
@@ -371,7 +390,7 @@ public class AuditorEngine
         }
     }
 
-    private async Task TryUpdateAndVerifyAsync(string projectOrPropsPath, string packageId, string? oldVersion, string newVersion)
+    private async Task TryUpdateAndVerifyAsync(string projectOrPropsPath, string packageId, string? oldVersion, string newVersion, int currentPercent)
     {
         if (oldVersion == null || newVersion == "Unknown") return;
 
@@ -383,7 +402,7 @@ public class AuditorEngine
                 Stage = ProgressStage.ApplyingUpdates,
                 CurrentPackage = packageId,
                 Message = $"Updating {packageId} to {newVersion}...",
-                PercentComplete = -1 // Indeterminate
+                PercentComplete = currentPercent // Keep current progress
             });
             _projectParser.UpdatePackageVersion(projectOrPropsPath, packageId, newVersion);
 
@@ -393,7 +412,7 @@ public class AuditorEngine
                 Stage = ProgressStage.Verifying,
                 CurrentPackage = packageId,
                 Message = $"Verifying build for {packageId}...",
-                PercentComplete = -1 // Indeterminate
+                PercentComplete = currentPercent // Keep current progress
             });
             var buildDir = Path.GetDirectoryName(projectOrPropsPath) ?? string.Empty;
             var success = await _cliService.BuildAsync(buildDir);
@@ -406,7 +425,7 @@ public class AuditorEngine
                     Stage = ProgressStage.Verifying,
                     CurrentPackage = packageId,
                     Message = $"✓ Build verified for {packageId} {newVersion}",
-                    PercentComplete = -1
+                    PercentComplete = currentPercent // Keep current progress
                 });
                 await SaveAuditLogAsync(projectOrPropsPath, packageId, oldVersion, newVersion);
             }
@@ -418,7 +437,7 @@ public class AuditorEngine
                     Stage = ProgressStage.Verifying,
                     CurrentPackage = packageId,
                     Message = $"Build failed for {packageId}. Rolling back to {oldVersion}...",
-                    PercentComplete = -1
+                    PercentComplete = currentPercent // Keep current progress
                 });
                 // Rollback
                 _projectParser.UpdatePackageVersion(projectOrPropsPath, packageId, oldVersion);

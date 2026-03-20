@@ -337,9 +337,7 @@
             await Task.Run(() => Engine.ApplyUpgradesAsync(targetPath, upgradablePackages));
 
             fixComplete = true;
-
-            // Rescan after fix
-            upgradablePackages = await Task.Run(() => Engine.GetUpgradablePackagesAsync(targetPath));
+            // Note: Rescan is NOT done automatically anymore - user can click "Scannen" to refresh
         }
         catch (Exception ex)
         {
