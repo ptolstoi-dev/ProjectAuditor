@@ -23,7 +23,7 @@
                 <button class="btn btn-secondary btn-lg" @onclick="OpenFolderInExplorer" title="Open in Explorer">
                     <span>📁 Im Explorer öffnen</span>
                 </button>
-                <button class="btn btn-primary btn-lg ml-3" @onclick="ScanDirectory" disabled="@isScanning">
+                <button class="btn btn-primary btn-lg ms-3" @onclick="ScanDirectory" disabled="@isScanning">
                     @if (isScanning)
                     {
                         <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
@@ -63,13 +63,13 @@
                     }
                     @if (currentProgress.PercentComplete >= 0)
                     {
-                        <div class="progress" style="height: 20px;">
+                        <div class="progress" style="height: 2rem;">
                             <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: @currentProgress.PercentComplete%" aria-valuenow="@currentProgress.PercentComplete" aria-valuemin="0" aria-valuemax="100">@currentProgress.PercentComplete%</div>
                         </div>
                     }
                     else
                     {
-                        <div class="progress" style="height: 20px;">
+                        <div class="progress" style="height: 2rem;">
                             <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
                         </div>
                     }

@@ -5,6 +5,7 @@
     <!-- Photino versions are explicit inside GUI, but we can centralize them later if we want. -->
   </PropertyGroup>
   <ItemGroup>
+    <PackageVersion Include="bootstrap" Version="5.3.8" />
     <PackageVersion Include="Photino.Blazor" Version="4.0.13" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="10.0.5" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.5" />

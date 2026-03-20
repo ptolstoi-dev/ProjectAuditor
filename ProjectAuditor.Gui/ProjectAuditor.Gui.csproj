@@ -9,6 +9,7 @@
 
 
     <ItemGroup>
+        <PackageReference Include="bootstrap" />
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" />
         <PackageReference Include="Photino.Blazor" />
     </ItemGroup>
