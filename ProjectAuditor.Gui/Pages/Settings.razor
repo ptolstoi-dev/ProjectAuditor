@@ -3,51 +3,73 @@
 @using ProjectAuditor.Core.Services
 @inject ISettingsService SettingsService
 
-<h1>Einstellungen</h1>
+<div class="mb-8">
+    <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">Einstellungen</h1>
+    <p class="text-gray-500 mt-2">Verwalten Sie hier die Konfiguration für die Projektauditierung.</p>
+</div>
 
-<div class="card mt-4">
-    <div class="card-body">
-        <h5 class="card-title">NuGet Audit Konfiguration</h5>
+<div class="max-w-2xl bg-white shadow-lg rounded-2xl border border-gray-100 overflow-hidden">
+    <div class="p-6 md:p-8">
+        <div class="flex items-center gap-3 mb-8">
+            <div class="p-2 bg-blue-50 rounded-lg text-blue-600">
+                <span class="oi oi-cog text-xl"></span>
+            </div>
+            <h2 class="text-xl font-bold text-gray-900">NuGet Audit Konfiguration</h2>
+        </div>
         
         @if (settings == null)
         {
-            <p><em>Lade Einstellungen...</em></p>
+            <div class="flex items-center justify-center p-12">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <span class="ml-3 text-gray-500">Lade Einstellungen...</span>
+            </div>
         }
         else
         {
-            <div class="form-group mb-3">
-                <label for="auditMode">Audit Modus</label>
-                <select id="auditMode" class="form-select" @bind="settings.AuditMode">
-                    @foreach (var mode in Enum.GetValues<NuGetAuditMode>())
-                    {
-                        <option value="@mode">@mode</option>
-                    }
-                </select>
-                <small class="form-text text-muted">
-                    Direct: Prüft nur direkte Paketreferenzen.<br />
-                    All: Prüft direkte und alle transitiven Paketreferenzen.
-                </small>
-            </div>
+            <div class="space-y-6">
+                <!-- Audit Mode -->
+                <div>
+                    <label for="auditMode" class="block text-sm font-semibold text-gray-700 mb-2">Audit Modus</label>
+                    <select id="auditMode" class="block w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none appearance-none" @bind="settings.AuditMode">
+                        @foreach (var mode in Enum.GetValues<NuGetAuditMode>())
+                        {
+                            <option value="@mode">@mode</option>
+                        }
+                    </select>
+                    <p class="mt-2 text-xs text-gray-500 leading-relaxed">
+                        <span class="font-medium text-blue-600">Direct:</span> Prüft nur direkte Paketreferenzen.<br />
+                        <span class="font-medium text-blue-600">All:</span> Prüft direkte und alle transitiven Paketreferenzen.
+                    </p>
+                </div>
 
-            <div class="form-group mb-4">
-                <label for="auditLevel">Audit Level (Schweregrad)</label>
-                <select id="auditLevel" class="form-select" @bind="settings.AuditLevel">
-                    @foreach (var level in Enum.GetValues<NuGetAuditLevel>())
-                    {
-                        <option value="@level">@level</option>
-                    }
-                </select>
-                <small class="form-text text-muted">
-                    Definiert ab welchem Schweregrad Schwachstellen gemeldet werden.
-                </small>
-            </div>
+                <!-- Audit Level -->
+                <div>
+                    <label for="auditLevel" class="block text-sm font-semibold text-gray-700 mb-2">Audit Level (Schweregrad)</label>
+                    <select id="auditLevel" class="block w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none appearance-none" @bind="settings.AuditLevel">
+                        @foreach (var level in Enum.GetValues<NuGetAuditLevel>())
+                        {
+                            <option value="@level">@level</option>
+                        }
+                    </select>
+                    <p class="mt-2 text-xs text-gray-500">
+                        Definiert ab welchem Schweregrad Schwachstellen gemeldet werden.
+                    </p>
+                </div>
 
-            <button class="btn btn-primary" @onclick="SaveSettings">Speichern</button>
-            
-            @if (showSuccessMessage)
-            {
-                <span class="text-success ms-3">Einstellungen erfolgreich gespeichert!</span>
-            }
+                <div class="pt-4 flex items-center gap-4">
+                    <button class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" @onclick="SaveSettings">
+                        Einstellungen speichern
+                    </button>
+                    
+                    @if (showSuccessMessage)
+                    {
+                        <div class="flex items-center gap-2 text-green-700 bg-green-50 px-4 py-2 rounded-lg animate-pulse">
+                            <span class="oi oi-check"></span>
+                            <span class="text-sm font-medium">Erfolgreich gespeichert!</span>
+                        </div>
+                    }
+                </div>
+            </div>
         }
     </div>
 </div>
@@ -74,3 +96,4 @@
         });
     }
 }
+

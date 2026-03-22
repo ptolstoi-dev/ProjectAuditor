@@ -7,72 +7,119 @@
 
 <PageTitle>Project Auditor</PageTitle>
 
-<div class="container-lg mt-4">
-    <div class="row mb-4">
-        <div class="col-12 text-center">
-            <h1 class="display-4 text-primary fw-bold">🚀 Project Auditor</h1>
-            <p class="lead">Scanne und aktualisiere NuGet-Pakete in deinen .NET Projekten.</p>
-        </div>
+<div class="max-w-7xl mt-8 pb-12">
+    <!-- Header -->
+    <div class="mb-10 px-4 sm:px-0 text-left">
+        <h1 class="text-5xl font-extrabold text-blue-600 mb-4 tracking-tight">
+            🚀 Project Auditor
+        </h1>
+        <p class="text-xl text-gray-600 max-w-2xl">
+            Scanne und aktualisiere NuGet-Pakete in deinen .NET Projekten.
+        </p>
     </div>
 
-    <div class="card shadow-sm mb-4">
-        <div class="card-body">
-            <h5 class="card-title">Projektverzeichnis</h5>
-            <div class="input-group mb-3">
-                <input type="text" class="form-control form-control-lg" @bind="targetPath" placeholder="C:\Pfad\zur\Solution" />
-                <button class="btn btn-secondary btn-lg" @onclick="OpenFolderInExplorer" title="Open in Explorer">
-                    <span>📁 Im Explorer öffnen</span>
-                </button>
-                <button class="btn btn-primary btn-lg ms-3" @onclick="ScanDirectory" disabled="@isScanning">
-                    @if (isScanning)
-                    {
-                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                        <span> Scanne...</span>
-                    }
-                    else
-                    {
-                        <span>🔍 Scannen</span>
-                    }
-                </button>
+    <!-- Main Config Card -->
+    <div class="bg-white shadow-lg rounded-2xl border border-gray-100 overflow-hidden mb-8 mx-4 sm:mx-0">
+        <div class="p-6 md:p-8 text-left">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="p-2 bg-blue-50 rounded-lg text-blue-600">
+                    <span class="oi oi-folder text-xl"></span>
+                </div>
+                <h2 class="text-xl font-bold text-gray-900">Projektverzeichnis</h2>
+            </div>
+            
+            <div class="flex flex-col gap-4 mb-4">
+                <div class="w-full">
+                    <input type="text" 
+                           class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-lg bg-gray-50" 
+                           @bind="targetPath" 
+                           placeholder="C:\Pfad\zur\Solution" />
+                </div>
+                <div class="flex flex-wrap gap-3">
+                    <button class="px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-all flex items-center whitespace-nowrap active:scale-95" 
+                            @onclick="OpenFolderInExplorer" 
+                            title="Im Explorer öffnen">
+                        <span class="mr-2">📁</span>
+                        <span>Im Explorer öffnen</span>
+                    </button>
+                    <button class="px-8 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center min-w-[160px] active:scale-95" 
+                            @onclick="ScanDirectory" 
+                            disabled="@isScanning">
+                        @if (isScanning)
+                        {
+                            <svg class="animate-spin h-5 w-5 mr-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>Scanne...</span>
+                        }
+                        else
+                        {
+                            <span class="oi oi-magnifying-glass mr-2"></span>
+                            <span>Projekt Scannen</span>
+                        }
+                    </button>
+                </div>
             </div>
             
             @if (errorMessage != null)
             {
-                <div class="alert alert-danger">@errorMessage</div>
+                <div class="bg-red-50 border-l-4 border-red-500 p-4 mt-6 rounded-r-lg shadow-sm">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <span class="oi oi-circle-x text-red-500"></span>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-red-700 font-bold">@errorMessage</p>
+                        </div>
+                    </div>
+                </div>
             }
 
             @if (currentProgress != null && (isScanning || isFixing))
             {
-                <div class="alert alert-info mt-3">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div>
-                            <span class="badge @GetProgressStageBadgeClass(currentProgress.Stage) me-2">@GetProgressStageText(currentProgress.Stage)</span>
-                            <span class="fw-bold">@currentProgress.Message</span>
+                <div class="bg-blue-50 border border-blue-100 rounded-2xl p-6 mt-8 shadow-sm">
+                    <div class="flex justify-between items-center mb-4">
+                        <div class="flex items-center text-left">
+                            <span class="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider mr-3 @GetProgressStageBadgeClass(currentProgress.Stage)">
+                                @GetProgressStageText(currentProgress.Stage)
+                            </span>
+                            <span class="font-bold text-blue-900">@currentProgress.Message</span>
                         </div>
-                        <span class="text-muted small">@currentProgress.PercentComplete%</span>
+                        <span class="text-blue-700 font-mono font-bold">@currentProgress.PercentComplete%</span>
                     </div>
+
                     @if (currentProgress.CurrentPackage != null)
                     {
-                        <div class="small text-muted mb-2">
-                            📦 Paket: <code>@currentProgress.CurrentPackage</code>
+                        <div class="text-xs text-blue-800 mb-4 bg-white/50 p-3 rounded-xl border border-blue-100 flex flex-wrap gap-y-2 gap-x-6 text-left">
+                            <div class="flex items-center gap-2">
+                                <span class="text-blue-400">📦</span>
+                                <span>Paket: <code class="font-mono font-bold bg-blue-100 px-1 rounded">@currentProgress.CurrentPackage</code></span>
+                            </div>
                             @if (!string.IsNullOrEmpty(currentProgress.CurrentProject))
                             {
-                                <span>| 📂 Projekt: <code>@currentProgress.CurrentProject</code></span>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-blue-400">📂</span>
+                                    <span>Projekt: <code class="font-mono font-bold bg-blue-100 px-1 rounded">@currentProgress.CurrentProject</code></span>
+                                </div>
                             }
                         </div>
                     }
-                    @if (currentProgress.PercentComplete >= 0)
-                    {
-                        <div class="progress" style="height: 2rem;">
-                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: @currentProgress.PercentComplete%" aria-valuenow="@currentProgress.PercentComplete" aria-valuemin="0" aria-valuemax="100">@currentProgress.PercentComplete%</div>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="progress" style="height: 2rem;">
-                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
-                        </div>
-                    }
+
+                    <div class="w-full bg-blue-100 rounded-full h-6 overflow-hidden shadow-inner border border-blue-200">
+                        @if (currentProgress.PercentComplete >= 0)
+                        {
+                            <div class="bg-blue-600 h-full transition-all duration-500 ease-out relative" style="width: @currentProgress.PercentComplete%">
+                                <div class="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite] skew-x-[-20deg]"></div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="bg-blue-600 h-full w-full animate-pulse relative">
+                                <div class="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite] skew-x-[-20deg]"></div>
+                            </div>
+                        }
+                    </div>
                 </div>
             }
         </div>
@@ -82,100 +129,139 @@
     {
         @if (!upgradablePackages.Any())
         {
-            <div class="alert alert-success d-flex align-items-center" role="alert">
-                <span>✅ Keine zu aktualisierenden oder anfälligen Pakete gefunden. Dein Projekt ist aktuell!</span>
+            <div class="bg-green-50 border-l-4 border-green-500 p-6 rounded-r-2xl shadow-sm mx-4 sm:mx-0 max-w-4xl text-left">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 text-green-500 text-2xl">
+                        <span class="oi oi-circle-check"></span>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-lg text-green-800 font-bold">Keine Updates gefunden.</p>
+                        <p class="text-green-700">Dein Projekt ist auf dem neuesten Stand!</p>
+                    </div>
+                </div>
             </div>
         }
         else
         {
-            <div class="card shadow-sm mb-4">
-                <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">📦 Gefundene Pakete (@GetTotalRows())</h5>
-                    <button class="btn btn-warning btn-sm fw-bold" @onclick="ApplyUpgrades" disabled="@isFixing">
+            <div class="bg-white shadow-xl rounded-2xl border border-gray-100 overflow-hidden mb-8 mx-4 sm:mx-0 text-left">
+                <div class="bg-gray-50 px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-gray-200 rounded-lg text-gray-600">
+                            <span class="oi oi-list text-lg"></span>
+                        </div>
+                        <h2 class="text-lg font-bold text-gray-900">
+                            Gefundene Pakete 
+                            <span class="ml-2 px-2.5 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full font-mono">@GetTotalRows()</span>
+                        </h2>
+                    </div>
+                    
+                    <button class="w-full sm:w-auto px-6 py-2.5 bg-amber-500 text-white font-bold rounded-xl hover:bg-amber-600 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center active:scale-95" 
+                            @onclick="ApplyUpgrades" 
+                            disabled="@isFixing">
                         @if (isFixing)
                         {
-                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                            <span> Führe Updates aus...</span>
+                            <svg class="animate-spin h-4 w-4 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>Führe Updates aus...</span>
                         }
                         else
                         {
-                            <span>⚡ Ausgewählte Updates anwenden</span>
+                            <span class="oi oi-bolt mr-2"></span>
+                            <span>Updates anwenden</span>
                         }
                     </button>
                 </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover table-sm mb-0" style="font-size: 0.95rem;">
-                            <thead class="table-light">
-                                <tr>
-                                    <th scope="col" style="width: 20%;">Projekt</th>
-                                    <th scope="col" style="width: 25%;">
-                                        <div class="form-check d-inline-block me-2">
-                                            <input class="form-check-input" type="checkbox" id="selectAll" checked="@AreAllSelected()" @onchange="ToggleSelectAll">
-                                            Paketname
-                                        </div>
-                                    </th>
-                                    <th scope="col" style="width: 15%;">Aktuelle Version</th>
-                                    <th scope="col" style="width: 20%;">Auditergebnis</th>
-                                    <th scope="col" style="width: 20%;">Zielversion</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var pkg in upgradablePackages)
+                
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-100">
+                        <thead class="bg-gray-50/50">
+                            <tr>
+                                <th scope="col" class="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[20%]">Projekt</th>
+                                <th scope="col" class="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[25%]">
+                                    <div class="flex items-center">
+                                        <input type="checkbox" 
+                                               id="selectAll" 
+                                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mr-3 cursor-pointer" 
+                                               checked="@AreAllSelected()" 
+                                               @onchange="ToggleSelectAll">
+                                        <span>Paketname</span>
+                                    </div>
+                                </th>
+                                <th scope="col" class="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[15%]">Aktuell</th>
+                                <th scope="col" class="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[20%]">Status</th>
+                                <th scope="col" class="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[20%]">Zielversion</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-50">
+                            @foreach (var pkg in upgradablePackages)
+                            {
+                                @foreach (var proj in pkg.Projects)
                                 {
-                                    @foreach (var proj in pkg.Projects)
-                                    {
-                                        <tr>
-                                            <td class="align-middle">
-                                                <span title="@proj.ProjectPath">@proj.ProjectName</span>
-                                            </td>
-                                            <td class="align-middle">
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" id="@($"{pkg.PackageId}_{proj.ProjectName}")" @bind="proj.IsSelectedForUpgrade">
-                                                    <label class="form-check-label" for="@($"{pkg.PackageId}_{proj.ProjectName}")">
-                                                        @pkg.PackageId
-                                                    </label>
-                                                </div>
-                                            </td>
-                                            <td class="align-middle">
-                                                <span class="badge p-2 bg-secondary text-white">@pkg.CurrentVersion</span>
-                                            </td>
-                                            <td class="align-middle">
+                                    <tr class="hover:bg-blue-50/30 transition-colors group">
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            <span class="truncate block max-w-[200px]" title="@proj.ProjectPath">@proj.ProjectName</span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="flex items-center">
+                                                <input type="checkbox" 
+                                                       id="@($"{pkg.PackageId}_{proj.ProjectName}")" 
+                                                       class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mr-3 cursor-pointer" 
+                                                       @bind="proj.IsSelectedForUpgrade">
+                                                <label class="text-sm font-bold text-gray-900 cursor-pointer group-hover:text-blue-600 transition-colors" for="@($"{pkg.PackageId}_{proj.ProjectName}")">
+                                                    @pkg.PackageId
+                                                </label>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <span class="px-2 py-1 bg-gray-100 text-gray-600 text-[11px] font-mono font-bold rounded border border-gray-200">
+                                                @pkg.CurrentVersion
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="flex flex-wrap gap-1">
                                                 @if (pkg.Vulnerabilities.Any())
                                                 {
                                                     @foreach (var vuln in pkg.Vulnerabilities)
                                                     {
-                                                        <span class="badge p-2 @GetSeverityClass(vuln.Severity) me-1">@vuln.Severity</span>
+                                                        <span class="px-2 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-tighter @GetSeverityClass(vuln.Severity)">
+                                                            @vuln.Severity
+                                                        </span>
                                                     }
                                                 }
                                                 else if (pkg.Reasons.Contains("Outdated"))
                                                 {
-                                                    <span class="badge p-2 bg-info text-dark">Outdated</span>
+                                                    <span class="px-2 py-0.5 bg-sky-100 text-sky-700 rounded text-[9px] font-extrabold uppercase tracking-tighter border border-sky-200">
+                                                        Outdated
+                                                    </span>
                                                 }
                                                 else if (pkg.Reasons.Contains("Deprecated"))
                                                 {
-                                                    <span class="badge p-2 bg-warning text-dark">Deprecated</span>
+                                                    <span class="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-[9px] font-extrabold uppercase tracking-tighter border border-amber-200">
+                                                        Deprecated
+                                                    </span>
                                                 }
-                                            </td>
-                                            <td class="align-middle">
-                                                <select class="form-select form-select-sm" @bind="pkg.SelectedVersion">
-                                                    @if (!pkg.AvailableVersions.Contains(pkg.SelectedVersion) && !string.IsNullOrEmpty(pkg.SelectedVersion))
-                                                    {
-                                                        <option value="@pkg.SelectedVersion">@pkg.SelectedVersion</option>
-                                                    }
-                                                    @foreach (var ver in pkg.AvailableVersions)
-                                                    {
-                                                        <option value="@ver">@ver</option>
-                                                    }
-                                                    <option value="@pkg.CurrentVersion">@pkg.CurrentVersion (Ignorieren)</option>
-                                                </select>
-                                            </td>
-                                        </tr>
-                                    }
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <select class="block w-full text-xs bg-gray-50 border-gray-200 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 py-1.5 font-mono font-bold text-blue-700 cursor-pointer" @bind="pkg.SelectedVersion">
+                                                @if (!pkg.AvailableVersions.Contains(pkg.SelectedVersion) && !string.IsNullOrEmpty(pkg.SelectedVersion))
+                                                {
+                                                    <option value="@pkg.SelectedVersion">@pkg.SelectedVersion</option>
+                                                }
+                                                @foreach (var ver in pkg.AvailableVersions)
+                                                {
+                                                    <option value="@ver">@ver</option>
+                                                }
+                                                <option value="@pkg.CurrentVersion">@pkg.CurrentVersion (Ignorieren)</option>
+                                            </select>
+                                        </td>
+                                    </tr>
                                 }
-                            </tbody>
-                        </table>
-                    </div>
+                            }
+                        </tbody>
+                    </table>
                 </div>
             </div>
         }
@@ -183,8 +269,14 @@
     
     @if (fixComplete)
     {
-         <div class="alert alert-info d-flex align-items-center" role="alert">
-            <span>ℹ️ Update-Vorgang abgeschlossen! (Log `nugetAudit_yyMMdd.json` wurde erzeugt)</span>
+         <div class="bg-blue-600 border-l-8 border-blue-400 p-6 rounded-r-2xl shadow-xl mx-4 sm:mx-0 max-w-4xl animate-bounce text-left">
+            <div class="flex items-center">
+                <span class="mr-4 text-white text-3xl">🎉</span>
+                <div>
+                    <p class="text-lg text-white font-bold">Update-Vorgang erfolgreich abgeschlossen!</p>
+                    <p class="text-blue-100 text-sm italic">Log <code class="bg-blue-700 px-2 py-0.5 rounded font-mono">nugetAudit_@(DateTime.Now.ToString("yyMMdd")).json</code> wurde erzeugt.</p>
+                </div>
+            </div>
         </div>
     }
 </div>
@@ -261,14 +353,14 @@
     {
         return stage switch
         {
-            ProgressStage.ScanningVulnerable => "bg-danger",
-            ProgressStage.ScanningOutdated => "bg-warning text-dark",
-            ProgressStage.ScanningDeprecated => "bg-warning text-dark",
-            ProgressStage.FetchingVersions => "bg-info",
-            ProgressStage.ApplyingUpdates => "bg-primary",
-            ProgressStage.Verifying => "bg-secondary",
-            ProgressStage.Complete => "bg-success",
-            _ => "bg-secondary"
+            ProgressStage.ScanningVulnerable => "bg-red-600 text-white",
+            ProgressStage.ScanningOutdated => "bg-amber-500 text-white",
+            ProgressStage.ScanningDeprecated => "bg-amber-500 text-white",
+            ProgressStage.FetchingVersions => "bg-blue-500 text-white",
+            ProgressStage.ApplyingUpdates => "bg-blue-700 text-white",
+            ProgressStage.Verifying => "bg-gray-600 text-white",
+            ProgressStage.Complete => "bg-green-600 text-white",
+            _ => "bg-gray-500 text-white"
         };
     }
 
@@ -279,14 +371,14 @@
     {
         return stage switch
         {
-            ProgressStage.ScanningVulnerable => "🔴 Scanning Vulnerable",
-            ProgressStage.ScanningOutdated => "🟡 Scanning Outdated",
-            ProgressStage.ScanningDeprecated => "🟡 Scanning Deprecated",
-            ProgressStage.FetchingVersions => "🔵 Fetching Versions",
-            ProgressStage.ApplyingUpdates => "🔧 Applying Updates",
-            ProgressStage.Verifying => "⚙️ Verifying",
-            ProgressStage.Complete => "✅ Complete",
-            _ => "🔄 Processing"
+            ProgressStage.ScanningVulnerable => "Scanning Vulnerable",
+            ProgressStage.ScanningOutdated => "Scanning Outdated",
+            ProgressStage.ScanningDeprecated => "Scanning Deprecated",
+            ProgressStage.FetchingVersions => "Fetching Versions",
+            ProgressStage.ApplyingUpdates => "Applying Updates",
+            ProgressStage.Verifying => "Verifying",
+            ProgressStage.Complete => "Complete",
+            _ => "Processing"
         };
     }
 
@@ -386,11 +478,11 @@
     {
         return severity.ToLowerInvariant() switch
         {
-            "critical" => "bg-danger text-white",      // Rot
-            "high" => "severity-high",                 // Orange mit besserem Kontrast
-            "moderate" => "severity-moderate",         // Gelb mit besserem Kontrast
-            "low" => "bg-info text-white",             // Blau
-            _ => "bg-secondary text-white"
+            "critical" => "bg-red-700 text-white",
+            "high" => "severity-high",
+            "moderate" => "severity-moderate",
+            "low" => "bg-sky-500 text-white",
+            _ => "bg-gray-500 text-white"
         };
     }
 }

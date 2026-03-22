@@ -9,7 +9,6 @@
 
 
     <ItemGroup>
-        <PackageReference Include="bootstrap" />
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" />
         <PackageReference Include="Photino.Blazor" />
     </ItemGroup>
@@ -29,5 +28,9 @@
     <ItemGroup>
       <ProjectReference Include="..\ProjectAuditor.Core\ProjectAuditor.Core.csproj" />
     </ItemGroup>
+
+    <Target Name="Tailwind" BeforeTargets="Build">
+        <Exec Command="npm.cmd run build:css" />
+    </Target>
 
 </Project>

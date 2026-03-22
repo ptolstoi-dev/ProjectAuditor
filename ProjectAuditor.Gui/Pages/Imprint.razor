@@ -1,84 +1,141 @@
 @page "/impressum"
 
-<h1>Impressum</h1>
+<PageTitle>Impressum</PageTitle>
 
-<div class="container mt-4">
-    <div class="card mb-4">
-        <div class="card-body">
-            <h5 class="card-title">Project Auditor</h5>
-            <p class="card-text">
-                Ein Open-Source-Tool zur automatisierten Überprüfung und Aktualisierung von NuGet-Paketen
-                in .NET-Projekten hinsichtlich Aktualität und Sicherheitslücken.
-            </p>
-        </div>
+<div class="max-w-7xl mt-8 pb-12">
+    <!-- Header -->
+    <div class="mb-10 px-4 sm:px-0 text-left">
+        <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">Impressum</h1>
+        <p class="text-gray-500 mt-2">Rechtliche Hinweise und Informationen zum Projekt.</p>
     </div>
 
-    <div class="card mb-4">
-        <div class="card-body">
-            <h5 class="card-title">Gewährleistungsausschluss</h5>
-            <p class="card-text">
-                <strong>Haftungsausschluss:</strong><br />
-                Diese Software wird "wie besehen" (as-is) bereitgestellt, ohne jegliche ausdrückliche oder
-                stillschweigende Gewährleistung. In keinem Fall haften die Autoren oder Copyright-Inhaber
-                für Schäden oder andere Ansprüche, die sich aus der Nutzung der Software ergeben.
-            </p>
-            <p class="card-text">
-                Die Nutzung dieser Software erfolgt auf eigenes Risiko. Es wird keine Garantie für die
-                Funktionsfähigkeit, Fehlerfreiheit oder Eignung für einen bestimmten Zweck übernommen.
-            </p>
-            <p class="card-text">
-                <strong>Keine Haftung für:</strong>
-            </p>
-            <ul>
-                <li>Datenverlust oder -beschädigung</li>
-                <li>Fehlerhafte Paket-Updates oder Build-Probleme</li>
-                <li>Sicherheitslücken in aktualisierten Paketen</li>
-                <li>Betriebsunterbrechungen oder finanzielle Verluste</li>
-                <li>Direkte, indirekte, zufällige oder Folgeschäden jeglicher Art</li>
-            </ul>
+    <div class="max-w-4xl space-y-8 mx-4 sm:mx-0">
+        <!-- Project Info -->
+        <div class="bg-white shadow-lg rounded-2xl border border-gray-100 overflow-hidden">
+            <div class="p-6 md:p-8">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="p-2 bg-blue-50 rounded-lg text-blue-600">
+                        <span class="oi oi-project text-xl"></span>
+                    </div>
+                    <h2 class="text-xl font-bold text-gray-900">Project Auditor</h2>
+                </div>
+                <p class="text-gray-600 leading-relaxed">
+                    Ein Open-Source-Tool zur automatisierten Überprüfung und Aktualisierung von NuGet-Paketen
+                    in .NET-Projekten hinsichtlich Aktualität und Sicherheitslücken.
+                </p>
+            </div>
         </div>
-    </div>
 
-    <div class="card mb-4">
-        <div class="card-body">
-            <h5 class="card-title">Lizenz</h5>
-            <p class="card-text">
-                Dieses Projekt ist Open Source Software. Die genauen Lizenzbedingungen finden Sie in der
-                LICENSE-Datei im Projekt-Repository.
-            </p>
-            <p class="card-text">
-                <strong>Quellcode:</strong><br />
-                Der Quellcode ist verfügbar auf GitHub:
-                <a href="https://github.com/ptolstoi-dev/ProjectAuditor" target="_blank" rel="noopener noreferrer">
-                    https://github.com/ptolstoi-dev/ProjectAuditor
-                </a>
-            </p>
+        <!-- Warranty Disclaimer -->
+        <div class="bg-white shadow-lg rounded-2xl border border-gray-100 overflow-hidden">
+            <div class="p-6 md:p-8 text-left">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="p-2 bg-red-50 rounded-lg text-red-600">
+                        <span class="oi oi-warning text-xl"></span>
+                    </div>
+                    <h2 class="text-xl font-bold text-gray-900">Gewährleistungsausschluss</h2>
+                </div>
+                
+                <div class="space-y-6 text-gray-600">
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-xl shadow-sm">
+                        <p class="text-sm font-bold text-red-700 uppercase tracking-widest mb-2">Haftungsausschluss</p>
+                        <p class="text-red-800 leading-relaxed">
+                            Diese Software wird "wie besehen" (as-is) bereitgestellt, ohne jegliche ausdrückliche oder
+                            stillschweigende Gewährleistung. In keinem Fall haften die Autoren oder Copyright-Inhaber
+                            für Schäden oder andere Ansprüche, die sich aus der Nutzung der Software ergeben.
+                        </p>
+                    </div>
+                    
+                    <p class="leading-relaxed">
+                        Die Nutzung dieser Software erfolgt auf eigenes Risiko. Es wird keine Garantie für die
+                        Funktionsfähigkeit, Fehlerfreiheit oder Eignung für einen bestimmten Zweck übernommen.
+                    </p>
+                    
+                    <div class="bg-gray-50 p-6 rounded-2xl border border-gray-100">
+                        <p class="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                            <span class="text-red-500">✕</span> Keine Haftung für:
+                        </p>
+                        <ul class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                            <li class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-red-400"></span> Datenverlust</li>
+                            <li class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-red-400"></span> Build-Probleme</li>
+                            <li class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-red-400"></span> Sicherheitslücken</li>
+                            <li class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-red-400"></span> Finanzielle Verluste</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
         </div>
-    </div>
 
-    <div class="card mb-4">
-        <div class="card-body">
-            <h5 class="card-title">Technologie-Stack</h5>
-            <p class="card-text">
-                <strong>Framework:</strong> .NET 10<br />
-                <strong>UI:</strong> Blazor (Photino.Blazor)<br />
-                <strong>Architektur:</strong> Plattformunabhängige Desktop-Anwendung
-            </p>
+        <!-- License & Tech -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+             <div class="bg-white shadow-lg rounded-2xl border border-gray-100 overflow-hidden">
+                <div class="p-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <span class="oi oi-document text-blue-500"></span> Lizenz
+                    </h3>
+                    <p class="text-sm text-gray-600 mb-6 leading-relaxed">
+                        Dieses Projekt ist Open Source. Die Bedingungen finden Sie im Repository.
+                    </p>
+                    <div class="bg-gray-50 rounded-xl p-4 border border-gray-100 group transition-all hover:bg-white hover:shadow-md">
+                        <p class="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-1">Quellcode</p>
+                        <a href="https://github.com/ptolstoi-dev/ProjectAuditor" target="_blank" rel="noopener noreferrer" class="text-xs font-mono font-bold text-gray-900 break-all group-hover:text-blue-600">
+                            github.com/ptolstoi-dev/ProjectAuditor
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white shadow-lg rounded-2xl border border-gray-100 overflow-hidden">
+                <div class="p-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <span class="oi oi-wrench text-blue-500"></span> Tech-Stack
+                    </h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center p-2 rounded-lg bg-blue-50/50">
+                            <span class="text-xs font-medium text-blue-700">Framework</span>
+                            <span class="text-sm font-bold text-gray-900">.NET 10</span>
+                        </div>
+                        <div class="flex justify-between items-center p-2 rounded-lg bg-blue-50/50">
+                            <span class="text-xs font-medium text-blue-700">UI</span>
+                            <span class="text-sm font-bold text-gray-900">Blazor (Photino)</span>
+                        </div>
+                        <div class="flex justify-between items-center p-2 rounded-lg bg-blue-50/50">
+                            <span class="text-xs font-medium text-blue-700">Style</span>
+                            <span class="text-sm font-bold text-gray-900">Tailwind CSS</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-    </div>
 
-    <div class="card mb-4">
-        <div class="card-body">
-            <h5 class="card-title">Hinweise zur Nutzung</h5>
-            <p class="card-text">
-                Vor der Verwendung von Project Auditor wird dringend empfohlen:
-            </p>
-            <ul>
-                <li>Eine Sicherung (Backup) Ihres Projekts anzulegen</li>
-                <li>Änderungen in einer Versionskontrolle (z.B. Git) zu verfolgen</li>
-                <li>Updates in einer Testumgebung zu prüfen, bevor sie produktiv eingesetzt werden</li>
-                <li>Build-Ergebnisse und Testergebnisse nach Updates zu überprüfen</li>
-            </ul>
+        <!-- Usage Notes -->
+        <div class="bg-amber-50 shadow-lg rounded-2xl border border-amber-100 overflow-hidden">
+            <div class="p-6 md:p-8">
+                <h2 class="text-xl font-bold text-amber-900 mb-4 flex items-center gap-3">
+                    <div class="p-2 bg-amber-200 rounded-lg text-amber-700">
+                        <span class="oi oi-info"></span>
+                    </div>
+                    Hinweise zur Nutzung
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="flex gap-3">
+                        <span class="text-amber-500 font-bold">01</span>
+                        <p class="text-sm text-amber-800">Backup Ihres Projekts anlegen</p>
+                    </div>
+                    <div class="flex gap-3">
+                        <span class="text-amber-500 font-bold">02</span>
+                        <p class="text-sm text-amber-800">Versionskontrolle (Git) nutzen</p>
+                    </div>
+                    <div class="flex gap-3">
+                        <span class="text-amber-500 font-bold">03</span>
+                        <p class="text-sm text-amber-800">Updates in Testumgebung prüfen</p>
+                    </div>
+                    <div class="flex gap-3">
+                        <span class="text-amber-500 font-bold">04</span>
+                        <p class="text-sm text-amber-800">Build & Testergebnisse verifizieren</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
