@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/doc/">
+    <File Path="doc/CreateProject.md" />
+    <File Path="doc/walkthrough.md" />
+  </Folder>
+  <Folder Name="/project/">
+    <File Path=".gitignore" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="README.md" />
+  </Folder>
+  <Project Path="ProjectAuditor.Cli/ProjectAuditor.Cli.csproj" />
+  <Project Path="ProjectAuditor.Core/ProjectAuditor.Core.csproj" />
+  <Project Path="ProjectAuditor.Gui/ProjectAuditor.Gui.csproj" />
+  <Project Path="ProjectAuditor.Tests/ProjectAuditor.Tests.csproj" />
+</Solution>

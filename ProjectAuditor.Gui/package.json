@@ -1,0 +1,19 @@
+{
+  "name": "projectauditor.gui",
+  "version": "1.0.0",
+  "description": "Die Desktop-Anwendung für den Projekt Auditor. Dieses Projekt verwendet **Photino.Blazor**, um eine leichtgewichtige, plattformübergreifende Benutzeroberfläche (Windows, Linux, macOS) mit Web-Technologien (HTML, CSS, C#) bereitzustellen.",
+  "main": "index.js",
+  "scripts": {
+    "build:css": "tailwindcss -i ./wwwroot/css/input.css -o ./wwwroot/css/app.css",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.2.2",
+    "autoprefixer": "^10.4.27",
+    "postcss": "^8.5.8",
+    "tailwindcss": "^4.2.2"
+  }
+}

@@ -1,0 +1,51 @@
+<div class="flex flex-col h-full bg-gray-900 text-white shadow-xl">
+    <!-- Branding / Logo Area -->
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800 flex-shrink-0">
+        <a class="text-xl font-bold tracking-tight text-white flex items-center gap-2" href="">
+            <span class="oi oi-project text-blue-500" aria-hidden="true"></span>
+            ProjectAuditor
+        </a>
+        <button class="md:hidden p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" @onclick="ToggleNavMenu">
+            <span class="oi oi-menu text-xl"></span>
+        </button>
+    </div>
+
+    <!-- Navigation Links -->
+    <nav class="@(collapseNavMenu ? "hidden" : "block") md:block flex-1 overflow-y-auto px-4 py-6 space-y-2" @onclick="ToggleNavMenu">
+        <NavLink class="flex items-center px-4 py-3 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800/50 hover:shadow-inner transition-all group" href="" Match="NavLinkMatch.All">
+            <span class="oi oi-home mr-3 text-lg group-hover:text-blue-500 transition-colors" aria-hidden="true"></span>
+            <span class="font-medium">Home</span>
+        </NavLink>
+        
+        <NavLink class="flex items-center px-4 py-3 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800/50 hover:shadow-inner transition-all group" href="contact">
+            <span class="oi oi-person mr-3 text-lg group-hover:text-blue-500 transition-colors" aria-hidden="true"></span>
+            <span class="font-medium">Kontakt</span>
+        </NavLink>
+        
+        <NavLink class="flex items-center px-4 py-3 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800/50 hover:shadow-inner transition-all group" href="settings">
+            <span class="oi oi-cog mr-3 text-lg group-hover:text-blue-500 transition-colors" aria-hidden="true"></span>
+            <span class="font-medium">Einstellungen</span>
+        </NavLink>
+        
+        <div class="border-t border-gray-800 my-4 opacity-50"></div>
+        
+        <NavLink class="flex items-center px-4 py-3 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800/50 hover:shadow-inner transition-all group" href="impressum">
+            <span class="oi oi-info mr-3 text-lg group-hover:text-blue-500 transition-colors" aria-hidden="true"></span>
+            <span class="font-medium">Impressum</span>
+        </NavLink>
+    </nav>
+    
+    <!-- Footer / Version info (Optional but nice) -->
+    <div class="px-6 py-4 border-t border-gray-800 text-xs text-gray-500 font-mono text-center flex-shrink-0">
+        v1.0.0-beta
+    </div>
+</div>
+
+@code {
+    private bool collapseNavMenu = true;
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+}

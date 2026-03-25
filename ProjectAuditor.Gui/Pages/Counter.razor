@@ -1,0 +1,23 @@
+@page "/counter"
+
+<PageTitle>Counter</PageTitle>
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+    <h1 class="text-3xl font-bold mb-4">Counter</h1>
+
+    <p class="text-lg mb-4 text-gray-700 font-medium">Aktueller Zählerstand: <span class="text-blue-600 font-bold">@currentCount</span></p>
+
+    <button class="px-4 py-2 bg-blue-600 text-white font-medium rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors" @onclick="IncrementCount">
+        Klick mich
+    </button>
+</div>
+
+@code {
+    private int currentCount = 0;
+
+    private void IncrementCount()
+    {
+        currentCount++;
+    }
+
+}
