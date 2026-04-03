@@ -4,6 +4,7 @@
 @using System.Diagnostics
 @inject DotNetCliService CliService
 @inject AuditorEngine Engine
+@inject Microsoft.JSInterop.IJSRuntime JSRuntime
 
 <PageTitle>Project Auditor</PageTitle>
 
@@ -109,7 +110,7 @@
                     <div class="w-full bg-blue-100 rounded-full h-6 overflow-hidden shadow-inner border border-blue-200">
                         @if (currentProgress.PercentComplete >= 0)
                         {
-                            <div class="bg-blue-600 h-full transition-all duration-500 ease-out relative" style="width: @currentProgress.PercentComplete%">
+                            <div class="bg-blue-600 h-full transition-all duration-500 ease-out relative" style="width: @(currentProgress.PercentComplete + "%")">
                                 <div class="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite] skew-x-[-20deg]"></div>
                             </div>
                         }
@@ -195,69 +196,80 @@
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-50">
-                            @foreach (var pkg in upgradablePackages)
+                            @foreach (var group in upgradablePackages.GroupBy(p => p.GroupName ?? "Weitere Pakete").OrderBy(g => g.Key == "Weitere Pakete" ? 1 : 0).ThenBy(g => g.Key))
                             {
-                                @foreach (var proj in pkg.Projects)
+                                @if (upgradablePackages.Any(p => p.GroupName != null))
                                 {
-                                    <tr class="hover:bg-blue-50/30 transition-colors group">
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            <span class="truncate block max-w-[200px]" title="@proj.ProjectPath">@proj.ProjectName</span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="flex items-center">
-                                                <input type="checkbox" 
-                                                       id="@($"{pkg.PackageId}_{proj.ProjectName}")" 
-                                                       class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mr-3 cursor-pointer" 
-                                                       @bind="proj.IsSelectedForUpgrade">
-                                                <label class="text-sm font-bold text-gray-900 cursor-pointer group-hover:text-blue-600 transition-colors" for="@($"{pkg.PackageId}_{proj.ProjectName}")">
-                                                    @pkg.PackageId
-                                                </label>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 py-1 bg-gray-100 text-gray-600 text-[11px] font-mono font-bold rounded border border-gray-200">
-                                                @pkg.CurrentVersion
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="flex flex-wrap gap-1">
-                                                @if (pkg.Vulnerabilities.Any())
-                                                {
-                                                    @foreach (var vuln in pkg.Vulnerabilities)
-                                                    {
-                                                        <span class="px-2 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-tighter @GetSeverityClass(vuln.Severity)">
-                                                            @vuln.Severity
-                                                        </span>
-                                                    }
-                                                }
-                                                else if (pkg.Reasons.Contains("Outdated"))
-                                                {
-                                                    <span class="px-2 py-0.5 bg-sky-100 text-sky-700 rounded text-[9px] font-extrabold uppercase tracking-tighter border border-sky-200">
-                                                        Outdated
-                                                    </span>
-                                                }
-                                                else if (pkg.Reasons.Contains("Deprecated"))
-                                                {
-                                                    <span class="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-[9px] font-extrabold uppercase tracking-tighter border border-amber-200">
-                                                        Deprecated
-                                                    </span>
-                                                }
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <select class="block w-full text-xs bg-gray-50 border-gray-200 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 py-1.5 font-mono font-bold text-blue-700 cursor-pointer" @bind="pkg.SelectedVersion">
-                                                @if (!pkg.AvailableVersions.Contains(pkg.SelectedVersion) && !string.IsNullOrEmpty(pkg.SelectedVersion))
-                                                {
-                                                    <option value="@pkg.SelectedVersion">@pkg.SelectedVersion</option>
-                                                }
-                                                @foreach (var ver in pkg.AvailableVersions)
-                                                {
-                                                    <option value="@ver">@ver</option>
-                                                }
-                                                <option value="@pkg.CurrentVersion">@pkg.CurrentVersion (Ignorieren)</option>
-                                            </select>
+                                    <tr>
+                                        <td colspan="5" class="px-6 py-2 text-xs font-bold text-gray-700 uppercase tracking-widest bg-gray-100 border-y border-gray-200">
+                                            @(group.Key != "Weitere Pakete" ? "📦 GRUPPE: " : "") @group.Key
                                         </td>
                                     </tr>
+                                }
+                                @foreach (var pkg in group)
+                                {
+                                    @foreach (var proj in pkg.Projects)
+                                    {
+                                        <tr class="hover:bg-blue-50/30 transition-colors group">
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <span class="truncate block max-w-[200px]" title="@proj.ProjectPath">@proj.ProjectName</span>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="flex items-center">
+                                                    <input type="checkbox" 
+                                                           id="@($"{pkg.PackageId}_{proj.ProjectName}")" 
+                                                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mr-3 cursor-pointer" 
+                                                           @bind="proj.IsSelectedForUpgrade">
+                                                    <label class="text-sm font-bold text-gray-900 cursor-pointer group-hover:text-blue-600 transition-colors" for="@($"{pkg.PackageId}_{proj.ProjectName}")">
+                                                        @pkg.PackageId
+                                                    </label>
+                                                </div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <span class="px-2 py-1 bg-gray-100 text-gray-600 text-[11px] font-mono font-bold rounded border border-gray-200">
+                                                    @pkg.CurrentVersion
+                                                </span>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="flex flex-wrap gap-1">
+                                                    @if (pkg.Vulnerabilities.Any())
+                                                    {
+                                                        @foreach (var vuln in pkg.Vulnerabilities)
+                                                        {
+                                                            <span class="px-2 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-tighter @GetSeverityClass(vuln.Severity)">
+                                                                @vuln.Severity
+                                                            </span>
+                                                        }
+                                                    }
+                                                    else if (pkg.Reasons.Contains("Outdated"))
+                                                    {
+                                                        <span class="px-2 py-0.5 bg-sky-100 text-sky-700 rounded text-[9px] font-extrabold uppercase tracking-tighter border border-sky-200">
+                                                            Outdated
+                                                        </span>
+                                                    }
+                                                    else if (pkg.Reasons.Contains("Deprecated"))
+                                                    {
+                                                        <span class="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-[9px] font-extrabold uppercase tracking-tighter border border-amber-200">
+                                                            Deprecated
+                                                        </span>
+                                                    }
+                                                </div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <select class="block w-full text-xs bg-gray-50 border-gray-200 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 py-1.5 font-mono font-bold text-blue-700 cursor-pointer" @bind="pkg.SelectedVersion">
+                                                    @if (!pkg.AvailableVersions.Contains(pkg.SelectedVersion) && !string.IsNullOrEmpty(pkg.SelectedVersion))
+                                                    {
+                                                        <option value="@pkg.SelectedVersion">@pkg.SelectedVersion</option>
+                                                    }
+                                                    @foreach (var ver in pkg.AvailableVersions)
+                                                    {
+                                                        <option value="@ver">@ver</option>
+                                                    }
+                                                    <option value="@pkg.CurrentVersion">@pkg.CurrentVersion (Ignorieren)</option>
+                                                </select>
+                                            </td>
+                                        </tr>
+                                    }
                                 }
                             }
                         </tbody>
@@ -269,12 +281,19 @@
     
     @if (fixComplete)
     {
-         <div class="bg-blue-600 border-l-8 border-blue-400 p-6 rounded-r-2xl shadow-xl mx-4 sm:mx-0 max-w-4xl animate-bounce text-left">
+         <div class="@(currentProgress?.IsError == true ? "bg-amber-600 border-amber-400" : "bg-blue-600 border-blue-400") border-l-8 p-6 rounded-r-2xl shadow-xl mx-4 sm:mx-0 max-w-4xl animate-bounce text-left">
             <div class="flex items-center">
-                <span class="mr-4 text-white text-3xl">🎉</span>
+                <span class="mr-4 text-white text-3xl">@(currentProgress?.IsError == true ? "⚠️" : "🎉")</span>
                 <div>
-                    <p class="text-lg text-white font-bold">Update-Vorgang erfolgreich abgeschlossen!</p>
-                    <p class="text-blue-100 text-sm italic">Log <code class="bg-blue-700 px-2 py-0.5 rounded font-mono">nugetAudit_@(DateTime.Now.ToString("yyMMdd")).json</code> wurde erzeugt.</p>
+                    <p class="text-lg text-white font-bold">@currentProgress?.Message</p>
+                    @if (currentProgress?.IsError != true)
+                    {
+                        <p class="text-blue-100 text-sm italic">Log <code class="bg-blue-700 px-2 py-0.5 rounded font-mono">nugetAudit_@(DateTime.Now.ToString("yyMMdd")).json</code> wurde erzeugt.</p>
+                    }
+                    else
+                    {
+                        <p class="text-amber-100 text-sm italic">Einige Updates konnten nicht verifiziert werden und wurden zurückgerollt.</p>
+                    }
                 </div>
             </div>
         </div>
@@ -360,6 +379,7 @@
             ProgressStage.ApplyingUpdates => "bg-blue-700 text-white",
             ProgressStage.Verifying => "bg-gray-600 text-white",
             ProgressStage.Complete => "bg-green-600 text-white",
+            ProgressStage.Failed => "bg-red-600 text-white",
             _ => "bg-gray-500 text-white"
         };
     }
@@ -378,6 +398,7 @@
             ProgressStage.ApplyingUpdates => "Applying Updates",
             ProgressStage.Verifying => "Verifying",
             ProgressStage.Complete => "Complete",
+            ProgressStage.Failed => "Failed",
             _ => "Processing"
         };
     }
@@ -425,6 +446,7 @@
 
             // Subscribe to progress updates
             Engine.OnProgress += OnProgressChanged;
+            Engine.OnGroupFallback = OnGroupFallbackHandler;
 
             await Task.Run(() => Engine.ApplyUpgradesAsync(targetPath, upgradablePackages));
 
@@ -439,6 +461,7 @@
         {
             // Unsubscribe from progress updates
             Engine.OnProgress -= OnProgressChanged;
+            Engine.OnGroupFallback = null;
             isFixing = false;
             StateHasChanged();
         }
@@ -484,5 +507,17 @@
             "low" => "bg-sky-500 text-white",
             _ => "bg-gray-500 text-white"
         };
+    }
+
+    private async Task<bool> OnGroupFallbackHandler(string groupName, int packageCount)
+    {
+        bool result = false;
+        // Dispatch to UI thread if we are in background thread
+        await InvokeAsync(async () =>
+        {
+            var message = $"Das gemeinsame Update für die Gruppe '{groupName}' ({packageCount} Pakete) ist fehlgeschlagen.\nEs gab wahrscheinlich Build-Fehler.\n\nMöchtest du einen Fallback versuchen und die Pakete einzeln und nacheinander aktualisieren (dauert länger)?";
+            result = await JSRuntime.InvokeAsync<bool>("confirm", message);
+        });
+        return result;
     }
 }

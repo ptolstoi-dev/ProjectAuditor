@@ -11,7 +11,8 @@ public enum ProgressStage
     FetchingVersions,
     ApplyingUpdates,
     Verifying,
-    Complete
+    Complete,
+    Failed
 }
 
 /// <summary>
@@ -43,6 +44,11 @@ public class ProgressUpdate
     /// Fortschritt in Prozent (0-100)
     /// </summary>
     public int PercentComplete { get; set; }
+
+    /// <summary>
+    /// Ob die Operation einen Fehler enthalten hat
+    /// </summary>
+    public bool IsError { get; set; }
 
     /// <summary>
     /// Zusätzliche Details (optional)

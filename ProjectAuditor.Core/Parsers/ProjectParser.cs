@@ -48,7 +48,7 @@ public class ProjectParser
     /// <summary>
     /// Updates the version of a specific package in the file and saves it.
     /// </summary>
-    public void UpdatePackageVersion(string filePath, string packageName, string newVersion)
+    public virtual void UpdatePackageVersion(string filePath, string packageName, string newVersion)
     {
         var isCpmFile = Path.GetFileName(filePath).Equals("Directory.Packages.props", StringComparison.OrdinalIgnoreCase);
         var doc = XDocument.Load(filePath);

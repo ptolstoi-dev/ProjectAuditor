@@ -16,6 +16,7 @@ namespace ProjectAuditor.Gui
                 .AddSingleton<ProjectAuditor.Core.Services.DotNetCliService>()
                 .AddSingleton<ProjectAuditor.Core.Parsers.ProjectParser>()
                 .AddSingleton<ProjectAuditor.Core.Services.AuditorEngine>()
+                .AddSingleton<ProjectAuditor.Core.Services.PackageGroupService>()
                 .AddSingleton<ProjectAuditor.Core.Services.ISettingsService, ProjectAuditor.Core.Services.SettingsService>();
 
             // register root component and selector

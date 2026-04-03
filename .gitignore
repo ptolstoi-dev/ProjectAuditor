@@ -102,5 +102,6 @@ yarn-error.log*
 error.txt
 gui_warnings.txt
 
-# Ignore JetBrains Rider project files
+# Ignore JetBrains Rider project & AI files 
 .idea/
+.junie/

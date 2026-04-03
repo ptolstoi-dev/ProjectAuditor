@@ -1,0 +1,25 @@
+  Wiederherzustellende Projekte werden ermittelt...
+  Alle Projekte sind für die Wiederherstellung auf dem neuesten Stand.
+
+Die folgenden Quellen wurden verwendet:
+   https://api.nuget.org/v3/index.json
+   C:\PAT\projekte\Production\Nuget
+   C:\Program Files (x86)\Microsoft SDKs\NuGetPackages\
+
+Für das Projekt "ProjectAuditor.Cli" liegen die folgenden Updates für zugehörige Pakete vor.
+   [net10.0]: 
+   Paket oberster Ebene                        Angefordert   Aufgelöst   Neueste
+   > Microsoft.Extensions.Logging              10.0.4        10.0.4      10.0.5 
+   > Microsoft.Extensions.Logging.Console      10.0.4        10.0.4      10.0.5 
+
+Für das Projekt "ProjectAuditor.Core" liegen die folgenden Updates für zugehörige Pakete vor.
+   [net10.0]: 
+   Paket oberster Ebene                             Angefordert   Aufgelöst   Neueste
+   > Microsoft.Extensions.Logging.Abstractions      10.0.4        10.0.4      10.0.5 
+
+Für das Projekt "ProjectAuditor.Gui" liegen die folgenden Updates für zugehörige Pakete vor.
+   [net10.0]: 
+   Paket oberster Ebene                      Angefordert   Aufgelöst   Neueste
+   > Microsoft.Extensions.Logging.Debug      10.0.4        10.0.4      10.0.5 
+
+Für das angegebene Projekt "ProjectAuditor.Tests" liegen gemäß den aktuellen Quellen keine Updates vor.

@@ -62,7 +62,7 @@ if (autoFix)
     logger = loggerFactory.CreateLogger<AuditorEngine>();
 }
 
-var engine = new AuditorEngine(cliService, projectParser, logger);
+var engine = new AuditorEngine(cliService, projectParser, null, logger);
 
 try
 {

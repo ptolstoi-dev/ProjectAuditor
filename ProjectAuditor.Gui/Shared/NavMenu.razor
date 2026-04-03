@@ -1,9 +1,9 @@
-<div class="flex flex-col h-full bg-gray-900 text-white shadow-xl">
+<div class="flex flex-col h-full bg-gray-900 text-white shadow-xl transition-all duration-300 @(isCollapsed ? "w-full md:w-20" : "w-full md:w-64") flex-shrink-0 md:min-h-screen">
     <!-- Branding / Logo Area -->
-    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800 flex-shrink-0">
+    <div class="flex items-center @(isCollapsed ? "md:justify-center md:px-0 px-6 justify-between" : "px-6 justify-between") py-4 border-b border-gray-800 flex-shrink-0">
         <a class="text-xl font-bold tracking-tight text-white flex items-center gap-2" href="">
-            <span class="oi oi-project text-blue-500" aria-hidden="true"></span>
-            ProjectAuditor
+            <span class="oi oi-project text-blue-500 w-6 text-center flex-shrink-0" aria-hidden="true"></span>
+            <span class="@(isCollapsed ? "md:hidden" : "") transition-opacity duration-300">ProjectAuditor</span>
         </a>
         <button class="md:hidden p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" @onclick="ToggleNavMenu">
             <span class="oi oi-menu text-xl"></span>
@@ -12,40 +12,56 @@
 
     <!-- Navigation Links -->
     <nav class="@(collapseNavMenu ? "hidden" : "block") md:block flex-1 overflow-y-auto px-4 py-6 space-y-2" @onclick="ToggleNavMenu">
-        <NavLink class="flex items-center px-4 py-3 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800/50 hover:shadow-inner transition-all group" href="" Match="NavLinkMatch.All">
-            <span class="oi oi-home mr-3 text-lg group-hover:text-blue-500 transition-colors" aria-hidden="true"></span>
-            <span class="font-medium">Home</span>
+        <NavLink class="@GetNavLinkClass()" href="" Match="NavLinkMatch.All" title="Home">
+            <span class="oi oi-home @(isCollapsed ? "md:mr-0 mr-3" : "mr-3") w-6 text-center flex-shrink-0 text-lg group-hover:text-blue-500 transition-all" aria-hidden="true"></span>
+            <span class="font-medium px-1 @(isCollapsed ? "md:hidden" : "")">Home</span>
         </NavLink>
         
-        <NavLink class="flex items-center px-4 py-3 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800/50 hover:shadow-inner transition-all group" href="contact">
-            <span class="oi oi-person mr-3 text-lg group-hover:text-blue-500 transition-colors" aria-hidden="true"></span>
-            <span class="font-medium">Kontakt</span>
+        <NavLink class="@GetNavLinkClass()" href="contact" title="Kontakt">
+            <span class="oi oi-person @(isCollapsed ? "md:mr-0 mr-3" : "mr-3") w-6 text-center flex-shrink-0 text-lg group-hover:text-blue-500 transition-all" aria-hidden="true"></span>
+            <span class="font-medium px-1 @(isCollapsed ? "md:hidden" : "")">Kontakt</span>
         </NavLink>
         
-        <NavLink class="flex items-center px-4 py-3 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800/50 hover:shadow-inner transition-all group" href="settings">
-            <span class="oi oi-cog mr-3 text-lg group-hover:text-blue-500 transition-colors" aria-hidden="true"></span>
-            <span class="font-medium">Einstellungen</span>
+        <NavLink class="@GetNavLinkClass()" href="settings" title="Einstellungen">
+            <span class="oi oi-cog @(isCollapsed ? "md:mr-0 mr-3" : "mr-3") w-6 text-center flex-shrink-0 text-lg group-hover:text-blue-500 transition-all" aria-hidden="true"></span>
+            <span class="font-medium px-1 @(isCollapsed ? "md:hidden" : "")">Einstellungen</span>
         </NavLink>
         
         <div class="border-t border-gray-800 my-4 opacity-50"></div>
         
-        <NavLink class="flex items-center px-4 py-3 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800/50 hover:shadow-inner transition-all group" href="impressum">
-            <span class="oi oi-info mr-3 text-lg group-hover:text-blue-500 transition-colors" aria-hidden="true"></span>
-            <span class="font-medium">Impressum</span>
+        <NavLink class="@GetNavLinkClass()" href="impressum" title="Impressum">
+            <span class="oi oi-info @(isCollapsed ? "md:mr-0 mr-3" : "mr-3") w-6 text-center flex-shrink-0 text-lg group-hover:text-blue-500 transition-all" aria-hidden="true"></span>
+            <span class="font-medium px-1 @(isCollapsed ? "md:hidden" : "")">Impressum</span>
         </NavLink>
     </nav>
     
-    <!-- Footer / Version info (Optional but nice) -->
-    <div class="px-6 py-4 border-t border-gray-800 text-xs text-gray-500 font-mono text-center flex-shrink-0">
-        v1.0.0-beta
+    <!-- Footer / Toggle & Version info -->
+    <div class="@(isCollapsed ? "md:justify-center md:px-0 px-6 justify-between" : "px-6 justify-between") py-4 border-t border-gray-800 flex items-center flex-shrink-0">
+        <div class="text-xs text-gray-500 font-mono @(isCollapsed ? "md:hidden" : "")">
+            v1.0.0-beta
+        </div>
+        <button class="hidden md:flex items-center justify-center w-10 h-10 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-all focus:outline-none" @onclick="ToggleSidebar" title="@(isCollapsed ? "Menü ausklappen" : "Menü einklappen")">
+            <span class="oi @(isCollapsed ? "oi-chevron-right" : "oi-chevron-left") w-6 text-center"></span>
+        </button>
     </div>
 </div>
 
 @code {
     private bool collapseNavMenu = true;
+    private bool isCollapsed = false;
 
     private void ToggleNavMenu()
     {
         collapseNavMenu = !collapseNavMenu;
+    }
+
+    private void ToggleSidebar()
+    {
+        isCollapsed = !isCollapsed;
+    }
+
+    private string GetNavLinkClass()
+    {
+        return $"flex items-center {(isCollapsed ? "md:justify-center md:px-0 md:w-12 md:mx-auto px-4" : "px-4")} py-3 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800/50 hover:shadow-inner transition-all group";
     }
 }

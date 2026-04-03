@@ -143,23 +143,42 @@ public class DotNetCliService
     /// <summary>
     /// Builds the target project or solution to test if changes are valid.
     /// </summary>
-    public async Task<bool> BuildAsync(string targetPath)
+    public virtual async Task<bool> BuildAsync(string targetPath)
     {
-        var processStartInfo = new ProcessStartInfo
+        try
         {
-            FileName = "dotnet",
-            Arguments = $"build \"{targetPath}\"",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
+            var processStartInfo = new ProcessStartInfo
+            {
+                FileName = "dotnet",
+                Arguments = $"build \"{targetPath}\"",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
 
-        using var process = Process.Start(processStartInfo);
-        if (process == null) return false;
+            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2)); // 2 minutes timeout
+            using var process = Process.Start(processStartInfo);
+            if (process == null) return false;
 
-        await process.WaitForExitAsync();
-        return process.ExitCode == 0;
+            try
+            {
+                await process.WaitForExitAsync(cts.Token);
+                return process.ExitCode == 0;
+            }
+            catch (OperationCanceledException)
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(true);
+                }
+                return false;
+            }
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>
@@ -167,20 +186,39 @@ public class DotNetCliService
     /// </summary>
     public async Task<bool> RestoreAsync(string targetPath)
     {
-        var processStartInfo = new ProcessStartInfo
+        try
         {
-            FileName = "dotnet",
-            Arguments = $"restore \"{targetPath}\"",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
+            var processStartInfo = new ProcessStartInfo
+            {
+                FileName = "dotnet",
+                Arguments = $"restore \"{targetPath}\"",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
 
-        using var process = Process.Start(processStartInfo);
-        if (process == null) return false;
+            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2)); // 2 minutes timeout
+            using var process = Process.Start(processStartInfo);
+            if (process == null) return false;
 
-        await process.WaitForExitAsync();
-        return process.ExitCode == 0;
+            try
+            {
+                await process.WaitForExitAsync(cts.Token);
+                return process.ExitCode == 0;
+            }
+            catch (OperationCanceledException)
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(true);
+                }
+                return false;
+            }
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

@@ -11,6 +11,11 @@ public class PackageUpgradeModel
     public string CurrentVersion { get; set; } = string.Empty;
 
     /// <summary>
+    /// The detected group name this package belongs to, if any.
+    /// </summary>
+    public string? GroupName { get; set; }
+
+    /// <summary>
     /// A list of available/newer versions fetched from NuGet or from dotnet list.
     /// </summary>
     public List<string> AvailableVersions { get; set; } = new();

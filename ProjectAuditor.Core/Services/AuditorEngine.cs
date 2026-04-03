@@ -8,12 +8,14 @@ public class AuditorEngine
 {
     private readonly DotNetCliService _cliService;
     private readonly ProjectParser _projectParser;
+    private readonly PackageGroupService? _packageGroupService;
     private readonly ILogger<AuditorEngine>? _logger;
 
-    public AuditorEngine(DotNetCliService cliService, ProjectParser projectParser, ILogger<AuditorEngine>? logger = null)
+    public AuditorEngine(DotNetCliService cliService, ProjectParser projectParser, PackageGroupService? packageGroupService = null, ILogger<AuditorEngine>? logger = null)
     {
         _cliService = cliService;
         _projectParser = projectParser;
+        _packageGroupService = packageGroupService;
         _logger = logger;
     }
 
@@ -23,6 +25,13 @@ public class AuditorEngine
     /// Event für Progress-Rückmeldungen bei Scan und Upgrade
     /// </summary>
     public event Action<ProgressUpdate>? OnProgress;
+
+    /// <summary>
+    /// Function called when a group update fails. 
+    /// Returns true if the user wants to fallback to individual updates.
+    /// Param 1: Group Name, Param 2: Num Packages in Group.
+    /// </summary>
+    public Func<string, int, Task<bool>>? OnGroupFallback;
 
     /// <summary>
     /// Hilfsmethode um Progress zu melden
@@ -101,7 +110,21 @@ public class AuditorEngine
             throw;
         }
 
-        return results.Values.ToList();
+        var values = results.Values.ToList();
+
+        if (_packageGroupService != null)
+        {
+            var ids = values.Select(v => v.PackageId).ToList();
+            await _packageGroupService.DetectAndSaveGroupsAsync(ids, path);
+            var knownGroups = await _packageGroupService.LoadGroupsAsync(path);
+            
+            foreach (var pkg in values)
+            {
+                pkg.GroupName = _packageGroupService.GetGroupName(pkg.PackageId, knownGroups);
+            }
+        }
+
+        return values;
     }
 
     private async Task ProcessResponseAsync(DotNetListPackageResponse? response, Dictionary<string, PackageUpgradeModel> results, string reason)
@@ -284,115 +307,123 @@ public class AuditorEngine
         var cpmPath = Path.Combine(basePath, "Directory.Packages.props");
         var usesCpm = File.Exists(cpmPath);
 
-        // Count total upgrades needed
-        int totalUpgrades = 0;
-        foreach (var pkg in packagesToUpgrade)
+        // Filter selectable
+        var applicablePackages = packagesToUpgrade.Where(pkg => !string.IsNullOrEmpty(pkg.SelectedVersion) && pkg.SelectedVersion != pkg.CurrentVersion && pkg.Projects.Any(p => p.IsSelectedForUpgrade)).ToList();
+        
+        if (!applicablePackages.Any())
         {
-            if (string.IsNullOrEmpty(pkg.SelectedVersion) || pkg.SelectedVersion == pkg.CurrentVersion)
-                continue;
-
-            var selectedProjects = pkg.Projects.Where(p => p.IsSelectedForUpgrade).ToList();
-            if (usesCpm)
-                totalUpgrades += 1; // CPM: one update per package
-            else
-                totalUpgrades += selectedProjects.Count; // Individual: one update per project
+            RaiseProgress(new ProgressUpdate { Stage = ProgressStage.Complete, Message = "No upgrades selected to apply.", PercentComplete = 100 });
+            return;
         }
 
-        int currentUpgradeIndex = 0;
-
+        int failedCount = 0;
         try
         {
-            RaiseProgress(new ProgressUpdate
-            {
-                Stage = ProgressStage.ApplyingUpdates,
-                Message = $"Starting to apply {totalUpgrades} upgrades...",
-                PercentComplete = 0
-            });
+            RaiseProgress(new ProgressUpdate { Stage = ProgressStage.ApplyingUpdates, Message = $"Starting to apply upgrades...", PercentComplete = 0 });
 
-            foreach (var pkg in packagesToUpgrade)
+            // Group packages by GroupName (or uniquely if null)
+            var groups = applicablePackages.GroupBy(p => p.GroupName ?? Guid.NewGuid().ToString()).ToList();
+
+            int totalGroups = groups.Count;
+            int currentGroupIndex = 0;
+
+            foreach (var group in groups)
             {
-                if (string.IsNullOrEmpty(pkg.SelectedVersion) || pkg.SelectedVersion == pkg.CurrentVersion)
+                currentGroupIndex++;
+                int percent = (int)((double)currentGroupIndex / totalGroups * 90);
+                
+                var packagesInGroup = group.ToList();
+                var groupDisplayName = !string.IsNullOrEmpty(packagesInGroup.First().GroupName) ? packagesInGroup.First().GroupName! : packagesInGroup.First().PackageId;
+
+
+                RaiseProgress(new ProgressUpdate
                 {
-                    continue; // Skip if no upgrade selected
-                }
+                    Stage = ProgressStage.ApplyingUpdates,
+                    Message = $"Applying upgrade for group '{groupDisplayName}' ({packagesInGroup.Count} packages) ({currentGroupIndex}/{totalGroups})",
+                    PercentComplete = percent
+                });
 
-                // Get selected projects
-                var selectedProjects = pkg.Projects.Where(p => p.IsSelectedForUpgrade).ToList();
-                if (!selectedProjects.Any()) continue;
-
-                // Apply updates
                 if (usesCpm)
                 {
-                    // If using CPM, we update the central props file once
-                    currentUpgradeIndex++;
-                    int percent = (int)((double)currentUpgradeIndex / totalUpgrades * 90);
-                    RaiseProgress(new ProgressUpdate
+                    // 1. Update all packages in CPM file
+                    foreach (var pkg in packagesInGroup)
+                        _projectParser.UpdatePackageVersion(cpmPath, pkg.PackageId, pkg.SelectedVersion);
+
+                    // 2. Build once
+                    var buildDir = Path.GetDirectoryName(cpmPath) ?? string.Empty;
+                    bool success = await _cliService.BuildAsync(buildDir);
+
+                    if (success)
                     {
-                        Stage = ProgressStage.ApplyingUpdates,
-                        CurrentPackage = pkg.PackageId,
-                        Message = $"Applying upgrade: {pkg.PackageId} {pkg.CurrentVersion} → {pkg.SelectedVersion} (CPM) ({currentUpgradeIndex}/{totalUpgrades})",
-                        PercentComplete = percent
-                    });
-                    _logger?.LogInformation($"Updating CPM for {pkg.PackageId} to {pkg.SelectedVersion}");
-                    await TryUpdateAndVerifyAsync(cpmPath, pkg.PackageId, pkg.CurrentVersion, pkg.SelectedVersion, percent);
-                    
-                    // Update progress after verification
-                    RaiseProgress(new ProgressUpdate
+                        foreach (var pkg in packagesInGroup)
+                            await SaveAuditLogAsync(cpmPath, pkg.PackageId, pkg.CurrentVersion, pkg.SelectedVersion);
+
+                        RaiseProgress(new ProgressUpdate { Stage = ProgressStage.ApplyingUpdates, Message = $"✓ Group '{groupDisplayName}' updated successfully.", PercentComplete = percent });
+                    }
+                    else
                     {
-                        Stage = ProgressStage.ApplyingUpdates,
-                        CurrentPackage = pkg.PackageId,
-                        Message = $"✓ Completed: {pkg.PackageId} {pkg.CurrentVersion} → {pkg.SelectedVersion}",
-                        PercentComplete = percent
-                    });
+                        // 3. Rollback
+                        foreach (var pkg in packagesInGroup)
+                            _projectParser.UpdatePackageVersion(cpmPath, pkg.PackageId, pkg.CurrentVersion);
+                        
+                        await _cliService.BuildAsync(buildDir); // Verify rollback
+
+                        RaiseProgress(new ProgressUpdate { Stage = ProgressStage.ApplyingUpdates, Message = $"✗ Group '{groupDisplayName}' failed. Rolled back.", PercentComplete = percent, IsError = true });
+
+                        // 4. Fallback prompt
+                        if (OnGroupFallback != null && packagesInGroup.Count > 1)
+                        {
+                            bool userWantsFallback = await OnGroupFallback(groupDisplayName, packagesInGroup.Count);
+                            if (userWantsFallback)
+                            {
+                                RaiseProgress(new ProgressUpdate { Stage = ProgressStage.ApplyingUpdates, Message = $"Fallback: Applying updates for '{groupDisplayName}' individually...", PercentComplete = percent });
+                                foreach (var pkg in packagesInGroup)
+                                {
+                                    bool indSuccess = await TryUpdateAndVerifyAsync(cpmPath, pkg.PackageId, pkg.CurrentVersion, pkg.SelectedVersion, percent);
+                                    if (!indSuccess) failedCount++;
+                                }
+                            }
+                            else failedCount += packagesInGroup.Count;
+                        }
+                        else failedCount += packagesInGroup.Count;
+                    }
                 }
                 else
                 {
-                    // Otherwise, update each selected project individually
-                    foreach (var proj in selectedProjects)
+                    // Non-CPM logic: fallback to individual upgrades per project to keep it simple, or group by project
+                    // Here we simply reuse TryUpdateAndVerifyAsync for individual ones.
+                    foreach (var pkg in packagesInGroup)
                     {
-                        currentUpgradeIndex++;
-                        int percent = (int)((double)currentUpgradeIndex / totalUpgrades * 90);
-                        RaiseProgress(new ProgressUpdate
+                        var selectedProjects = pkg.Projects.Where(p => p.IsSelectedForUpgrade).ToList();
+                        foreach (var proj in selectedProjects)
                         {
-                            Stage = ProgressStage.ApplyingUpdates,
-                            CurrentPackage = pkg.PackageId,
-                            CurrentProject = proj.ProjectName,
-                            Message = $"Applying upgrade: {pkg.PackageId} {pkg.CurrentVersion} → {pkg.SelectedVersion} in {proj.ProjectName} ({currentUpgradeIndex}/{totalUpgrades})",
-                            PercentComplete = percent
-                        });
-                        _logger?.LogInformation($"Updating Project {proj.ProjectName} for {pkg.PackageId} to {pkg.SelectedVersion}");
-                        await TryUpdateAndVerifyAsync(proj.ProjectPath, pkg.PackageId, pkg.CurrentVersion, pkg.SelectedVersion, percent);
-                        
-                        // Update progress after verification
-                        RaiseProgress(new ProgressUpdate
-                        {
-                            Stage = ProgressStage.ApplyingUpdates,
-                            CurrentPackage = pkg.PackageId,
-                            CurrentProject = proj.ProjectName,
-                            Message = $"✓ Completed: {pkg.PackageId} {pkg.CurrentVersion} → {pkg.SelectedVersion} in {proj.ProjectName}",
-                            PercentComplete = percent
-                        });
+                            bool success = await TryUpdateAndVerifyAsync(proj.ProjectPath, pkg.PackageId, pkg.CurrentVersion, pkg.SelectedVersion, percent);
+                            if (!success) failedCount++;
+                        }
                     }
                 }
             }
 
-            RaiseProgress(new ProgressUpdate
+            if (failedCount > 0)
             {
-                Stage = ProgressStage.Complete,
-                Message = "All upgrades completed successfully!",
-                PercentComplete = 100
-            });
+                RaiseProgress(new ProgressUpdate { Stage = ProgressStage.Failed, Message = $"Completed with failures. {failedCount} packages were rolled back.", PercentComplete = 100, IsError = true });
+            }
+            else
+            {
+                RaiseProgress(new ProgressUpdate { Stage = ProgressStage.Complete, Message = "All upgrades completed successfully!", PercentComplete = 100 });
+            }
         }
         catch (Exception ex)
         {
             _logger?.LogError($"Error during upgrade: {ex.Message}");
+            RaiseProgress(new ProgressUpdate { Stage = ProgressStage.Failed, Message = $"Critical error: {ex.Message}", PercentComplete = 100, IsError = true });
             throw;
         }
     }
 
-    private async Task TryUpdateAndVerifyAsync(string projectOrPropsPath, string packageId, string? oldVersion, string newVersion, int currentPercent)
+    private async Task<bool> TryUpdateAndVerifyAsync(string projectOrPropsPath, string packageId, string? oldVersion, string newVersion, int currentPercent)
     {
-        if (oldVersion == null || newVersion == "Unknown") return;
+        if (oldVersion == null || newVersion == "Unknown") return false;
 
         try
         {
@@ -428,6 +459,7 @@ public class AuditorEngine
                     PercentComplete = currentPercent // Keep current progress
                 });
                 await SaveAuditLogAsync(projectOrPropsPath, packageId, oldVersion, newVersion);
+                return true;
             }
             else
             {
@@ -437,18 +469,33 @@ public class AuditorEngine
                     Stage = ProgressStage.Verifying,
                     CurrentPackage = packageId,
                     Message = $"Build failed for {packageId}. Rolling back to {oldVersion}...",
-                    PercentComplete = currentPercent // Keep current progress
+                    PercentComplete = currentPercent, // Keep current progress
+                    IsError = true
                 });
                 // Rollback
                 _projectParser.UpdatePackageVersion(projectOrPropsPath, packageId, oldVersion);
                 // Verify rollback
                 await _cliService.BuildAsync(buildDir);
+                return false;
             }
         }
         catch (Exception ex)
         {
             _logger?.LogError($"Error updating {packageId}: {ex.Message}");
-            throw;
+            RaiseProgress(new ProgressUpdate
+            {
+                Stage = ProgressStage.Verifying,
+                CurrentPackage = packageId,
+                Message = $"Error: {ex.Message}",
+                PercentComplete = currentPercent,
+                IsError = true
+            });
+            // Attempt to restore original version if parser failed mid-save (unlikely but safe)
+            if (oldVersion != null)
+            {
+                try { _projectParser.UpdatePackageVersion(projectOrPropsPath, packageId, oldVersion); } catch { }
+            }
+            return false;
         }
     }
 

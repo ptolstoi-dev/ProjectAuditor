@@ -1,0 +1,12 @@
+[
+  {
+    "GroupName": "Microsoft.Extensions",
+    "Prefix": "Microsoft.Extensions.",
+    "KnownPackages": [
+      "Microsoft.Extensions.Logging",
+      "Microsoft.Extensions.Logging.Console",
+      "Microsoft.Extensions.Logging.Abstractions",
+      "Microsoft.Extensions.Logging.Debug"
+    ]
+  }
+]
