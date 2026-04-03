@@ -13,7 +13,7 @@ public class AuditorEngineTests
     public async Task ApplyUpgradesAsync_HandlesBuildFailureAndRollsBack()
     {
         // Arrange
-        var mockCli = new Mock<DotNetCliService>(new Mock<ISettingsService>().Object);
+        var mockCli = new Mock<DotNetCliService>(new Mock<ISettingsService>().Object, new Mock<ILocalizationService>().Object);
         var mockParser = new Mock<ProjectParser>();
         var mockLogger = new Mock<ILogger<AuditorEngine>>();
         var engine = new AuditorEngine(mockCli.Object, mockParser.Object, null, mockLogger.Object);
@@ -36,7 +36,11 @@ public class AuditorEngineTests
         };
 
         // Mock build failure
-        mockCli.Setup(c => c.BuildAsync(It.IsAny<string>())).ReturnsAsync(false);
+        mockCli.Setup(c => c.BuildAsync(It.IsAny<string>())).ReturnsAsync(new BuildResult 
+        { 
+            Success = false, 
+            ErrorMessage = "Test build failure" 
+        });
         
         // Track progress updates
         var updates = new List<ProgressUpdate>();
@@ -56,5 +60,57 @@ public class AuditorEngineTests
         
         // Cleanup
         if (File.Exists(tempFile)) File.Delete(tempFile);
+    }
+
+    [Fact]
+    public async Task ApplyUpgradesAsync_CreatesLogOnError()
+    {
+        // Arrange
+        var mockCli = new Mock<DotNetCliService>(new Mock<ISettingsService>().Object, new Mock<ILocalizationService>().Object);
+        var mockParser = new Mock<ProjectParser>();
+        var engine = new AuditorEngine(mockCli.Object, mockParser.Object, null, null);
+        
+        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        Directory.CreateDirectory(tempDir);
+        var tempFile = Path.Combine(tempDir, "test.csproj");
+        File.WriteAllText(tempFile, "<Project />");
+        
+        var upgrade = new PackageUpgradeModel
+        {
+            PackageId = "ErrorPkg",
+            CurrentVersion = "1.0.0",
+            SelectedVersion = "2.0.0",
+            AvailableVersions = new List<string> { "2.0.0" },
+            Reasons = new List<string> { "Test" },
+            Vulnerabilities = new List<Vulnerability>(),
+            Projects = new List<ProjectUsageModel> 
+            { 
+                new ProjectUsageModel { ProjectPath = tempFile, IsSelectedForUpgrade = true } 
+            }
+        };
+
+        // Build failure
+        mockCli.Setup(c => c.BuildAsync(It.IsAny<string>())).ReturnsAsync(new BuildResult 
+        { 
+            Success = false, 
+            ErrorMessage = "CRITICAL_BUILD_ERROR_TEXT" 
+        });
+
+        // Act
+        await engine.ApplyUpgradesAsync(tempDir, new List<PackageUpgradeModel> { upgrade });
+
+        // Assert
+        var dateStr = DateTime.Now.ToString("yyMMdd");
+        var logFile = Path.Combine(tempDir, $"nugetAudit_{dateStr}.json");
+        
+        Assert.True(File.Exists(logFile), $"Audit log file {logFile} should exist.");
+        
+        var json = File.ReadAllText(logFile);
+        Assert.Contains("Failed", json);
+        Assert.Contains("CRITICAL_BUILD_ERROR_TEXT", json);
+        Assert.Contains("ErrorPkg", json);
+
+        // Cleanup
+        Directory.Delete(tempDir, true);
     }
 }

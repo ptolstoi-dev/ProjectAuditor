@@ -5,6 +5,8 @@
 @inject DotNetCliService CliService
 @inject AuditorEngine Engine
 @inject Microsoft.JSInterop.IJSRuntime JSRuntime
+@inject ILocalizationService LocalizationService
+@inject ISettingsService SettingsService
 
 <PageTitle>Project Auditor</PageTitle>
 
@@ -12,10 +14,10 @@
     <!-- Header -->
     <div class="mb-10 px-4 sm:px-0 text-left">
         <h1 class="text-5xl font-extrabold text-blue-600 mb-4 tracking-tight">
-            🚀 Project Auditor
+            🚀 @L("Index.Title")
         </h1>
         <p class="text-xl text-gray-600 max-w-2xl">
-            Scanne und aktualisiere NuGet-Pakete in deinen .NET Projekten.
+            @L("Index.Description")
         </p>
     </div>
 
@@ -26,7 +28,7 @@
                 <div class="p-2 bg-blue-50 rounded-lg text-blue-600">
                     <span class="oi oi-folder text-xl"></span>
                 </div>
-                <h2 class="text-xl font-bold text-gray-900">Projektverzeichnis</h2>
+                <h2 class="text-xl font-bold text-gray-900">@L("Index.ProjectDirectoryLabel")</h2>
             </div>
             
             <div class="flex flex-col gap-4 mb-4">
@@ -34,14 +36,14 @@
                     <input type="text" 
                            class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-lg bg-gray-50" 
                            @bind="targetPath" 
-                           placeholder="C:\Pfad\zur\Solution" />
+                           placeholder="@L("Index.Placeholder")" />
                 </div>
                 <div class="flex flex-wrap gap-3">
                     <button class="px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-all flex items-center whitespace-nowrap active:scale-95" 
                             @onclick="OpenFolderInExplorer" 
-                            title="Im Explorer öffnen">
+                            title="@L("Index.OpenExplorer")">
                         <span class="mr-2">📁</span>
-                        <span>Im Explorer öffnen</span>
+                        <span>@L("Index.OpenExplorer")</span>
                     </button>
                     <button class="px-8 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center min-w-[160px] active:scale-95" 
                             @onclick="ScanDirectory" 
@@ -52,12 +54,12 @@
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
-                            <span>Scanne...</span>
+                            <span>@L("Index.Scanning")</span>
                         }
                         else
                         {
                             <span class="oi oi-magnifying-glass mr-2"></span>
-                            <span>Projekt Scannen</span>
+                            <span>@L("Index.ScanProject")</span>
                         }
                     </button>
                 </div>
@@ -95,13 +97,13 @@
                         <div class="text-xs text-blue-800 mb-4 bg-white/50 p-3 rounded-xl border border-blue-100 flex flex-wrap gap-y-2 gap-x-6 text-left">
                             <div class="flex items-center gap-2">
                                 <span class="text-blue-400">📦</span>
-                                <span>Paket: <code class="font-mono font-bold bg-blue-100 px-1 rounded">@currentProgress.CurrentPackage</code></span>
+                                <span>@L("Progress.Package"): <code class="font-mono font-bold bg-blue-100 px-1 rounded">@currentProgress.CurrentPackage</code></span>
                             </div>
                             @if (!string.IsNullOrEmpty(currentProgress.CurrentProject))
                             {
                                 <div class="flex items-center gap-2">
                                     <span class="text-blue-400">📂</span>
-                                    <span>Projekt: <code class="font-mono font-bold bg-blue-100 px-1 rounded">@currentProgress.CurrentProject</code></span>
+                                    <span>@L("Progress.Project"): <code class="font-mono font-bold bg-blue-100 px-1 rounded">@currentProgress.CurrentProject</code></span>
                                 </div>
                             }
                         </div>
@@ -136,8 +138,8 @@
                         <span class="oi oi-circle-check"></span>
                     </div>
                     <div class="ml-4">
-                        <p class="text-lg text-green-800 font-bold">Keine Updates gefunden.</p>
-                        <p class="text-green-700">Dein Projekt ist auf dem neuesten Stand!</p>
+                        <p class="text-lg text-green-800 font-bold">@L("Index.NoPackagesFound")</p>
+                        <p class="text-green-700">@L("Index.NoUpdatesMessage")</p>
                     </div>
                 </div>
             </div>
@@ -151,11 +153,11 @@
                             <span class="oi oi-list text-lg"></span>
                         </div>
                         <h2 class="text-lg font-bold text-gray-900">
-                            Gefundene Pakete 
+                            @L("Index.FoundPackages")
                             <span class="ml-2 px-2.5 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full font-mono">@GetTotalRows()</span>
                         </h2>
                     </div>
-                    
+
                     <button class="w-full sm:w-auto px-6 py-2.5 bg-amber-500 text-white font-bold rounded-xl hover:bg-amber-600 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center active:scale-95" 
                             @onclick="ApplyUpgrades" 
                             disabled="@isFixing">
@@ -165,12 +167,12 @@
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
-                            <span>Führe Updates aus...</span>
+                            <span>@L("Index.ApplyingUpdates")</span>
                         }
                         else
                         {
                             <span class="oi oi-bolt mr-2"></span>
-                            <span>Updates anwenden</span>
+                            <span>@L("Index.ApplyUpdatesButton")</span>
                         }
                     </button>
                 </div>
@@ -179,7 +181,7 @@
                     <table class="min-w-full divide-y divide-gray-100">
                         <thead class="bg-gray-50/50">
                             <tr>
-                                <th scope="col" class="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[20%]">Projekt</th>
+                                <th scope="col" class="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[20%]">@L("Index.TableHeaderProject")</th>
                                 <th scope="col" class="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[25%]">
                                     <div class="flex items-center">
                                         <input type="checkbox" 
@@ -187,22 +189,22 @@
                                                class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mr-3 cursor-pointer" 
                                                checked="@AreAllSelected()" 
                                                @onchange="ToggleSelectAll">
-                                        <span>Paketname</span>
+                                        <span>@L("Index.TableHeaderPackage")</span>
                                     </div>
                                 </th>
-                                <th scope="col" class="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[15%]">Aktuell</th>
-                                <th scope="col" class="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[20%]">Status</th>
-                                <th scope="col" class="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[20%]">Zielversion</th>
+                                <th scope="col" class="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[15%]">@L("Index.TableHeaderCurrent")</th>
+                                <th scope="col" class="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[20%]">@L("Index.TableHeaderStatus")</th>
+                                <th scope="col" class="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[20%]">@L("Index.TableHeaderTargetVersion")</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-50">
-                            @foreach (var group in upgradablePackages.GroupBy(p => p.GroupName ?? "Weitere Pakete").OrderBy(g => g.Key == "Weitere Pakete" ? 1 : 0).ThenBy(g => g.Key))
+                            @foreach (var group in upgradablePackages.GroupBy(p => p.GroupName ?? L("Index.OtherPackages")).OrderBy(g => g.Key == L("Index.OtherPackages") ? 1 : 0).ThenBy(g => g.Key))
                             {
                                 @if (upgradablePackages.Any(p => p.GroupName != null))
                                 {
                                     <tr>
                                         <td colspan="5" class="px-6 py-2 text-xs font-bold text-gray-700 uppercase tracking-widest bg-gray-100 border-y border-gray-200">
-                                            @(group.Key != "Weitere Pakete" ? "📦 GRUPPE: " : "") @group.Key
+                                            @(group.Key != L("Index.OtherPackages") ? $"📦 {L("Index.GroupHeader")} " : "") @group.Key
                                         </td>
                                     </tr>
                                 }
@@ -244,13 +246,13 @@
                                                     else if (pkg.Reasons.Contains("Outdated"))
                                                     {
                                                         <span class="px-2 py-0.5 bg-sky-100 text-sky-700 rounded text-[9px] font-extrabold uppercase tracking-tighter border border-sky-200">
-                                                            Outdated
+                                                            @L("Index.StatusOutdated")
                                                         </span>
                                                     }
                                                     else if (pkg.Reasons.Contains("Deprecated"))
                                                     {
                                                         <span class="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-[9px] font-extrabold uppercase tracking-tighter border border-amber-200">
-                                                            Deprecated
+                                                            @L("Index.StatusDeprecated")
                                                         </span>
                                                     }
                                                 </div>
@@ -265,7 +267,7 @@
                                                     {
                                                         <option value="@ver">@ver</option>
                                                     }
-                                                    <option value="@pkg.CurrentVersion">@pkg.CurrentVersion (Ignorieren)</option>
+                                                    <option value="@pkg.CurrentVersion">@pkg.CurrentVersion (@L("Index.IgnoreOption"))</option>
                                                 </select>
                                             </td>
                                         </tr>
@@ -281,24 +283,31 @@
     
     @if (fixComplete)
     {
-         <div class="@(currentProgress?.IsError == true ? "bg-amber-600 border-amber-400" : "bg-blue-600 border-blue-400") border-l-8 p-6 rounded-r-2xl shadow-xl mx-4 sm:mx-0 max-w-4xl animate-bounce text-left">
+         <div class="@(currentProgress?.IsError == true ? "bg-amber-600 border-amber-400" : "bg-blue-600 border-blue-400") border-l-8 p-6 rounded-2xl shadow-xl mx-4 sm:mx-0 max-w-4xl animate-bounce text-left cursor-pointer hover:shadow-2xl transition-shadow" @onclick="OpenLogModal">
             <div class="flex items-center">
                 <span class="mr-4 text-white text-3xl">@(currentProgress?.IsError == true ? "⚠️" : "🎉")</span>
-                <div>
+                <div class="flex-1">
                     <p class="text-lg text-white font-bold">@currentProgress?.Message</p>
                     @if (currentProgress?.IsError != true)
                     {
-                        <p class="text-blue-100 text-sm italic">Log <code class="bg-blue-700 px-2 py-0.5 rounded font-mono">nugetAudit_@(DateTime.Now.ToString("yyMMdd")).json</code> wurde erzeugt.</p>
+                        <p class="text-blue-100 text-sm italic">@L("Index.LogGenerated").Replace("{logFile}", $"nugetAudit_{DateTime.Now:yyMMdd}.json")</p>
+                        <p class="text-blue-100 text-xs mt-1 opacity-75">@L("Index.ClickToViewLogs")</p>
                     }
                     else
                     {
-                        <p class="text-amber-100 text-sm italic">Einige Updates konnten nicht verifiziert werden und wurden zurückgerollt.</p>
+                        <p class="text-amber-100 text-sm italic">@L("Index.SomeUpdatesFailed")</p>
                     }
                 </div>
+                <span class="ml-4 text-white text-xl opacity-75">
+                    <span class="oi oi-external-link"></span>
+                </span>
             </div>
         </div>
     }
 </div>
+
+<!-- Audit Log Modal -->
+<AuditLogModal IsVisible="@showLogModal" OnClose="@CloseLogModal" AuditLogPath="@GetAuditLogPath()" />
 
 @code {
     private string targetPath = string.Empty;
@@ -308,18 +317,28 @@
     private string? errorMessage;
     private List<PackageUpgradeModel>? upgradablePackages;
     private ProgressUpdate? currentProgress;
+    private bool showLogModal = false;
 
     /// <summary>
-    /// Initialize with current working directory
+    /// Hilfsmethode zum Abrufen von lokalisierten Strings.
     /// </summary>
-    protected override void OnInitialized()
+    private string L(string key) => LocalizationService.GetString(key, key);
+
+    /// <summary>
+    /// Initialize with current working directory and load localization settings
+    /// </summary>
+    protected override async Task OnInitializedAsync()
     {
-        // Set initial path to current working directory if empty
+        // Lade die Spracheinstellung aus den Einstellungen
+        var settings = await SettingsService.LoadSettingsAsync();
+        LocalizationService.SetLanguage(settings.Language);
+
+        // Setze initial path zu current working directory wenn leer
         if (string.IsNullOrEmpty(targetPath))
         {
             targetPath = Directory.GetCurrentDirectory();
         }
-        base.OnInitialized();
+        await base.OnInitializedAsync();
     }
 
     /// <summary>
@@ -346,7 +365,7 @@
             // Validate path exists
             if (string.IsNullOrEmpty(targetPath) || !Directory.Exists(targetPath))
             {
-                errorMessage = "Das eingegebene Verzeichnis existiert nicht.";
+                errorMessage = LocalizationService.GetString("Errors.DirectoryNotFound", "Das eingegebene Verzeichnis existiert nicht.");
                 return;
             }
 
@@ -361,7 +380,9 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"Fehler beim Öffnen des Explorers: {ex.Message}";
+            var errorMsg = LocalizationService.GetString("Errors.OpenExplorerError", "Fehler beim Öffnen des Explorers: {error}")
+                .Replace("{error}", ex.Message);
+            errorMessage = errorMsg;
         }
     }
 
@@ -385,22 +406,23 @@
     }
 
     /// <summary>
-    /// Get human-readable text for a progress stage
+    /// Get human-readable text for a progress stage - localized
     /// </summary>
     private string GetProgressStageText(ProgressStage stage)
     {
-        return stage switch
+        var key = stage switch
         {
-            ProgressStage.ScanningVulnerable => "Scanning Vulnerable",
-            ProgressStage.ScanningOutdated => "Scanning Outdated",
-            ProgressStage.ScanningDeprecated => "Scanning Deprecated",
-            ProgressStage.FetchingVersions => "Fetching Versions",
-            ProgressStage.ApplyingUpdates => "Applying Updates",
-            ProgressStage.Verifying => "Verifying",
-            ProgressStage.Complete => "Complete",
-            ProgressStage.Failed => "Failed",
-            _ => "Processing"
+            ProgressStage.ScanningVulnerable => "Progress.ScanningVulnerable",
+            ProgressStage.ScanningOutdated => "Progress.ScanningOutdated",
+            ProgressStage.ScanningDeprecated => "Progress.ScanningDeprecated",
+            ProgressStage.FetchingVersions => "Progress.FetchingVersions",
+            ProgressStage.ApplyingUpdates => "Progress.ApplyingUpdates",
+            ProgressStage.Verifying => "Progress.Verifying",
+            ProgressStage.Complete => "Progress.Completed",
+            ProgressStage.Failed => "Progress.Failed",
+            _ => "Progress.Scanning"
         };
+        return LocalizationService.GetString(key, key);
     }
 
     private async Task ScanDirectory()
@@ -421,7 +443,9 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"Fehler beim Scannen: {ex.Message}";
+            var errorMsg = LocalizationService.GetString("Errors.ScanError", "Fehler beim Scannen: {error}")
+                .Replace("{error}", ex.Message);
+            errorMessage = errorMsg;
         }
         finally
         {
@@ -455,7 +479,9 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"Fehler bei der Reparatur: {ex.Message}";
+            var errorMsg = LocalizationService.GetString("Errors.FixError", "Fehler bei der Reparatur: {error}")
+                .Replace("{error}", ex.Message);
+            errorMessage = errorMsg;
         }
         finally
         {
@@ -515,9 +541,30 @@
         // Dispatch to UI thread if we are in background thread
         await InvokeAsync(async () =>
         {
-            var message = $"Das gemeinsame Update für die Gruppe '{groupName}' ({packageCount} Pakete) ist fehlgeschlagen.\nEs gab wahrscheinlich Build-Fehler.\n\nMöchtest du einen Fallback versuchen und die Pakete einzeln und nacheinander aktualisieren (dauert länger)?";
+            var message = LocalizationService.GetString("Errors.GroupFallbackPrompt", 
+                "Das gemeinsame Update für die Gruppe '{group}' ({count} Pakete) ist fehlgeschlagen.\nEs gab wahrscheinlich Build-Fehler.\n\nMöchtest du einen Fallback versuchen und die Pakete einzeln und nacheinander aktualisieren (dauert länger)?")
+                .Replace("{group}", groupName)
+                .Replace("{count}", packageCount.ToString());
             result = await JSRuntime.InvokeAsync<bool>("confirm", message);
         });
         return result;
+    }
+
+    private void OpenLogModal()
+    {
+        showLogModal = true;
+    }
+
+    private async Task CloseLogModal()
+    {
+        showLogModal = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private string GetAuditLogPath()
+    {
+        var dateStr = DateTime.Now.ToString("yyMMdd");
+        var logFileName = $"nugetAudit_{dateStr}.json";
+        return Path.Combine(targetPath, logFileName);
     }
 }

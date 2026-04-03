@@ -1,0 +1,160 @@
+@using System.Text.Json
+@using System.IO
+@using ProjectAuditor.Core.Services
+
+<div class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center @(IsVisible ? "block" : "hidden")" @onclick="OnBackdropClick">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col mx-4" @onclick:stopPropagation="true">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <span class="oi oi-document text-2xl text-blue-600"></span>
+                <h2 class="text-xl font-bold text-gray-900">@L("Audit.LogTitle")</h2>
+            </div>
+            <button class="p-2 hover:bg-gray-100 rounded-lg transition-colors focus:outline-none" @onclick="Close">
+                <span class="oi oi-x text-xl text-gray-500"></span>
+            </button>
+        </div>
+
+        <!-- Content -->
+        <div class="flex-1 overflow-y-auto px-6 py-4">
+            @if (LogEntries == null || LogEntries.Count == 0)
+            {
+                <div class="text-center py-12">
+                    <span class="oi oi-info text-4xl text-gray-300 block mb-3"></span>
+                    <p class="text-gray-500">@L("Audit.NoLogsFound")</p>
+                </div>
+            }
+            else
+            {
+                <div class="space-y-3">
+                    @foreach (var entry in LogEntries)
+                    {
+                        bool isFailed = entry.ContainsKey("Status") && entry["Status"]?.ToString() == "Failed";
+                        string borderClass = isFailed ? "border-red-200 bg-red-50 hover:bg-red-100" : "border-gray-200 bg-gray-50 hover:bg-gray-100";
+                        
+                        <div class="rounded-lg p-4 border @borderClass transition-colors">
+                            <div class="flex items-start justify-between mb-2">
+                                <div class="flex-1">
+                                    <h3 class="font-bold text-gray-900 flex items-center gap-2">
+                                        <span class="oi @(isFailed ? "oi-warning text-red-500" : "oi-box text-blue-500")"></span>
+                                        @(entry["PackageId"]?.ToString() ?? "Unknown")
+                                        
+                                        @if (isFailed)
+                                        {
+                                            <span class="bg-red-100 text-red-800 text-[10px] px-2 py-0.5 rounded uppercase font-black">
+                                                @L("Audit.StatusFailed")
+                                            </span>
+                                        }
+                                        else if (entry.ContainsKey("Status"))
+                                        {
+                                            <span class="bg-green-100 text-green-800 text-[10px] px-2 py-0.5 rounded uppercase font-black">
+                                                @L("Audit.StatusSuccess")
+                                            </span>
+                                        }
+                                    </h3>
+                                </div>
+                                <span class="text-xs text-gray-500">
+                                    @(DateTime.TryParse(entry["Timestamp"]?.ToString(), out var date) 
+                                        ? date.ToString("yyyy-MM-dd HH:mm:ss") 
+                                        : entry["Timestamp"]?.ToString())
+                                </span>
+                            </div>
+                            
+                            <div class="ml-6 space-y-1 text-sm">
+                                <div class="flex gap-2">
+                                    <span class="text-gray-500 min-w-[80px]">@L("Audit.OldVersion")</span>
+                                    <span class="font-mono font-bold text-gray-700">@(entry["OldVersion"]?.ToString() ?? "-")</span>
+                                </div>
+                                <div class="flex gap-2">
+                                    <span class="text-gray-500 min-w-[80px]">@L("Audit.NewVersion")</span>
+                                    <span class="font-mono font-bold @(isFailed ? "text-red-600" : "text-green-600")">@(entry["NewVersion"]?.ToString() ?? "-")</span>
+                                </div>
+                                <div class="flex gap-2">
+                                    <span class="text-gray-500 min-w-[80px]">@L("Audit.File")</span>
+                                    <span class="font-mono text-xs text-gray-600">@(entry["FileUpdated"]?.ToString() ?? "-")</span>
+                                </div>
+
+                                @if (isFailed && entry.ContainsKey("ErrorMessage") && !string.IsNullOrEmpty(entry["ErrorMessage"]?.ToString()))
+                                {
+                                    <div class="mt-2 pt-2 border-t border-red-200">
+                                        <span class="text-red-700 font-bold block mb-1">@L("Audit.Error")</span>
+                                        <pre class="bg-red-100/50 p-2 rounded text-[10px] text-red-900 overflow-x-auto whitespace-pre-wrap font-mono">@(entry["ErrorMessage"]?.ToString())</pre>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <!-- Footer -->
+        <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0 bg-gray-50">
+            <button class="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500" @onclick="Close">
+                @L("Audit.CloseButton")
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public bool IsVisible { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public string? AuditLogPath { get; set; }
+
+    [Inject]
+    public ILocalizationService? LocalizationService { get; set; }
+
+    private List<Dictionary<string, object>>? LogEntries { get; set; }
+
+    /// <summary>
+    /// Hilfsmethode zum Abrufen von lokalisierten Strings.
+    /// </summary>
+    private string L(string key) => LocalizationService?.GetString(key, key) ?? key;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsVisible)
+        {
+            await LoadLogFile();
+        }
+    }
+
+    private async Task LoadLogFile()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(AuditLogPath) || !File.Exists(AuditLogPath))
+            {
+                LogEntries = new();
+                return;
+            }
+
+            var json = await File.ReadAllTextAsync(AuditLogPath);
+            LogEntries = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(json) ?? new();
+            
+            // Sortiere nach Zeitstempel absteigend (neueste zuerst)
+            LogEntries = LogEntries.OrderByDescending(e => e.ContainsKey("Timestamp") ? e["Timestamp"].ToString() : "").ToList();
+        }
+        catch (Exception)
+        {
+            // Fehlerbehandlung
+            LogEntries = new();
+        }
+    }
+
+    private async Task Close()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task OnBackdropClick()
+    {
+        await Close();
+    }
+}

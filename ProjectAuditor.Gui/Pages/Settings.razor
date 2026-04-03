@@ -2,26 +2,48 @@
 @using ProjectAuditor.Core.Models
 @using ProjectAuditor.Core.Services
 @inject ISettingsService SettingsService
+@inject ILocalizationService LocalizationService
 
 <div class="mb-8">
-    <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">Einstellungen</h1>
-    <p class="text-gray-500 mt-2">Verwalten Sie hier die Konfiguration für die Projektauditierung.</p>
+    <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">@L("Settings.Title")</h1>
+    <p class="text-gray-500 mt-2">@L("Settings.Description")</p>
 </div>
 
 <div class="max-w-2xl bg-white shadow-lg rounded-2xl border border-gray-100 overflow-hidden">
     <div class="p-6 md:p-8">
-        <div class="flex items-center gap-3 mb-8">
+        <!-- Sprache -->
+        <div class="flex items-center gap-3 mb-8 pb-6 border-b border-gray-200">
+            <div class="p-2 bg-purple-50 rounded-lg text-purple-600">
+                <span class="oi oi-globe text-xl"></span>
+            </div>
+            <h2 class="text-xl font-bold text-gray-900">@L("Settings.Language")</h2>
+        </div>
+
+        <div class="mb-8">
+            <label for="language" class="block text-sm font-semibold text-gray-700 mb-2">@L("Settings.Language")</label>
+            <select id="language" class="block w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all outline-none appearance-none" @onchange="OnLanguageChanged">
+                @foreach (var lang in LocalizationService.GetAvailableLanguages())
+                {
+                    <option value="@lang.Code" selected="@(LocalizationService.GetCurrentLanguage() == lang.Code)">@lang.Name</option>
+                }
+            </select>
+            <p class="mt-2 text-xs text-gray-500">
+                @L("Settings.LanguageDescription")
+            </p>
+        </div>
+
+        <div class="flex items-center gap-3 mb-8 pb-6 border-b border-gray-200">
             <div class="p-2 bg-blue-50 rounded-lg text-blue-600">
                 <span class="oi oi-cog text-xl"></span>
             </div>
-            <h2 class="text-xl font-bold text-gray-900">NuGet Audit Konfiguration</h2>
+            <h2 class="text-xl font-bold text-gray-900">@L("Settings.NuGetAuditConfig")</h2>
         </div>
         
         @if (settings == null)
         {
             <div class="flex items-center justify-center p-12">
                 <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <span class="ml-3 text-gray-500">Lade Einstellungen...</span>
+                <span class="ml-3 text-gray-500">@L("Settings.LoadingSettings")</span>
             </div>
         }
         else
@@ -29,7 +51,7 @@
             <div class="space-y-6">
                 <!-- Audit Mode -->
                 <div>
-                    <label for="auditMode" class="block text-sm font-semibold text-gray-700 mb-2">Audit Modus</label>
+                    <label for="auditMode" class="block text-sm font-semibold text-gray-700 mb-2">@L("Settings.AuditMode")</label>
                     <select id="auditMode" class="block w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none appearance-none" @bind="settings.AuditMode">
                         @foreach (var mode in Enum.GetValues<NuGetAuditMode>())
                         {
@@ -37,14 +59,13 @@
                         }
                     </select>
                     <p class="mt-2 text-xs text-gray-500 leading-relaxed">
-                        <span class="font-medium text-blue-600">Direct:</span> Prüft nur direkte Paketreferenzen.<br />
-                        <span class="font-medium text-blue-600">All:</span> Prüft direkte und alle transitiven Paketreferenzen.
+                        @L("Settings.AuditModeDescription")
                     </p>
                 </div>
 
                 <!-- Audit Level -->
                 <div>
-                    <label for="auditLevel" class="block text-sm font-semibold text-gray-700 mb-2">Audit Level (Schweregrad)</label>
+                    <label for="auditLevel" class="block text-sm font-semibold text-gray-700 mb-2">@L("Settings.AuditLevel")</label>
                     <select id="auditLevel" class="block w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none appearance-none" @bind="settings.AuditLevel">
                         @foreach (var level in Enum.GetValues<NuGetAuditLevel>())
                         {
@@ -52,20 +73,20 @@
                         }
                     </select>
                     <p class="mt-2 text-xs text-gray-500">
-                        Definiert ab welchem Schweregrad Schwachstellen gemeldet werden.
+                        @L("Settings.AuditLevelDescription")
                     </p>
                 </div>
 
                 <div class="pt-4 flex items-center gap-4">
                     <button class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" @onclick="SaveSettings">
-                        Einstellungen speichern
+                        @L("Settings.SaveButton")
                     </button>
                     
                     @if (showSuccessMessage)
                     {
                         <div class="flex items-center gap-2 text-green-700 bg-green-50 px-4 py-2 rounded-lg animate-pulse">
                             <span class="oi oi-check"></span>
-                            <span class="text-sm font-medium">Erfolgreich gespeichert!</span>
+                            <span class="text-sm font-medium">@L("Settings.SuccessMessage")</span>
                         </div>
                     }
                 </div>
@@ -77,23 +98,49 @@
 @code {
     private ProjectAuditorSettings settings = null!;
     private bool showSuccessMessage = false;
+    
+    /// <summary>
+    /// Hilfsmethode zum Abrufen von lokalisierten Strings.
+    /// </summary>
+    private string L(string key) => LocalizationService.GetString(key, key);
 
     protected override async Task OnInitializedAsync()
     {
         settings = await SettingsService.LoadSettingsAsync();
+        
+        // Setze die Sprache basierend auf den geladenen Einstellungen
+        LocalizationService.SetLanguage(settings.Language);
+    }
+
+    /// <summary>
+    /// Behandelt die Sprachänderung und speichert die Einstellung.
+    /// </summary>
+    private async Task OnLanguageChanged(ChangeEventArgs e)
+    {
+        var selectedLanguage = e.Value?.ToString();
+        if (selectedLanguage != null && settings != null)
+        {
+            settings.Language = selectedLanguage;
+            LocalizationService.SetLanguage(selectedLanguage);
+            await SaveSettings();
+            // Seitenwechsel erzwingt Neuladung mit neuer Sprache
+            await Task.Delay(500);
+        }
     }
 
     private async Task SaveSettings()
     {
-        await SettingsService.SaveSettingsAsync(settings);
-        showSuccessMessage = true;
-        
-        // Hide message after 3 seconds
-        _ = Task.Delay(3000).ContinueWith(_ => 
+        if (settings != null)
         {
-            showSuccessMessage = false;
-            InvokeAsync(StateHasChanged);
-        });
+            await SettingsService.SaveSettingsAsync(settings);
+            showSuccessMessage = true;
+            
+            // Verberge Nachricht nach 3 Sekunden
+            _ = Task.Delay(3000).ContinueWith(_ => 
+            {
+                showSuccessMessage = false;
+                InvokeAsync(StateHasChanged);
+            });
+        }
     }
 }
-

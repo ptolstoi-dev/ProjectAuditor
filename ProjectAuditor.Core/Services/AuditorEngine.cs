@@ -4,22 +4,16 @@ using Microsoft.Extensions.Logging;
 
 namespace ProjectAuditor.Core.Services;
 
-public class AuditorEngine
+public class AuditorEngine(
+    DotNetCliService cliService,
+    ProjectParser projectParser,
+    PackageGroupService? packageGroupService = null,
+    ILogger<AuditorEngine>? logger = null,
+    ILocalizationService? localizationService = null)
 {
-    private readonly DotNetCliService _cliService;
-    private readonly ProjectParser _projectParser;
-    private readonly PackageGroupService? _packageGroupService;
-    private readonly ILogger<AuditorEngine>? _logger;
+    private readonly ILocalizationService _localizationService = localizationService ?? new LocalizationService();
 
-    public AuditorEngine(DotNetCliService cliService, ProjectParser projectParser, PackageGroupService? packageGroupService = null, ILogger<AuditorEngine>? logger = null)
-    {
-        _cliService = cliService;
-        _projectParser = projectParser;
-        _packageGroupService = packageGroupService;
-        _logger = logger;
-    }
-
-    private static readonly HttpClient _httpClient = new HttpClient();
+    private static readonly HttpClient HttpClient = new();
 
     /// <summary>
     /// Event für Progress-Rückmeldungen bei Scan und Upgrade
@@ -39,12 +33,12 @@ public class AuditorEngine
     private void RaiseProgress(ProgressUpdate update)
     {
         OnProgress?.Invoke(update);
-        _logger?.LogInformation($"[{update.Stage}] {update.Message}");
+        logger?.LogInformation($"[{update.Stage}] {update.Message}");
     }
 
     public async Task<List<PackageUpgradeModel>> GetUpgradablePackagesAsync(string path)
     {
-        _logger?.LogInformation($"Scanning for upgradable packages in {path}");
+        logger?.LogInformation($"Scanning for upgradable packages in {path}");
 
         var results = new Dictionary<string, PackageUpgradeModel>();
 
@@ -54,30 +48,30 @@ public class AuditorEngine
             RaiseProgress(new ProgressUpdate
             {
                 Stage = ProgressStage.ScanningVulnerable,
-                Message = "Scanning for vulnerable packages...",
+                Message = _localizationService.GetString("Scanning.ScanningVulnerable", "Scanning for vulnerable packages..."),
                 PercentComplete = 10
             });
-            var vulnerableResponse = await _cliService.ListPackagesAsync(path, "vulnerable");
+            var vulnerableResponse = await cliService.ListPackagesAsync(path, "vulnerable");
             await ProcessResponseAsync(vulnerableResponse, results, "Vulnerable");
 
             // 2. Get Outdated packages
             RaiseProgress(new ProgressUpdate
             {
                 Stage = ProgressStage.ScanningOutdated,
-                Message = "Scanning for outdated packages...",
+                Message = _localizationService.GetString("Scanning.ScanningOutdated", "Scanning for outdated packages..."),
                 PercentComplete = 30
             });
-            var outdatedResponse = await _cliService.ListPackagesAsync(path, "outdated");
+            var outdatedResponse = await cliService.ListPackagesAsync(path, "outdated");
             await ProcessResponseAsync(outdatedResponse, results, "Outdated");
 
             // 3. Get Deprecated packages
             RaiseProgress(new ProgressUpdate
             {
                 Stage = ProgressStage.ScanningDeprecated,
-                Message = "Scanning for deprecated packages...",
+                Message = _localizationService.GetString("Scanning.ScanningDeprecated", "Scanning for deprecated packages..."),
                 PercentComplete = 50
             });
-            var deprecatedResponse = await _cliService.ListPackagesAsync(path, "deprecated");
+            var deprecatedResponse = await cliService.ListPackagesAsync(path, "deprecated");
             await ProcessResponseAsync(deprecatedResponse, results, "Deprecated");
 
             // 4. Fetch versions for all packages
@@ -87,40 +81,52 @@ public class AuditorEngine
             {
                 currentPackageIndex++;
                 int percent = 50 + (int)((double)currentPackageIndex / totalPackages * 40);
+                var versionMessage = _localizationService.GetString("Scanning.FetchingVersions", "Fetching versions for {packageId}... ({current}/{total})")
+                    .Replace("{packageId}", package.PackageId)
+                    .Replace("{current}", currentPackageIndex.ToString())
+                    .Replace("{total}", totalPackages.ToString());
                 RaiseProgress(new ProgressUpdate
                 {
                     Stage = ProgressStage.FetchingVersions,
                     CurrentPackage = package.PackageId,
-                    Message = $"Fetching versions for {package.PackageId} ({currentPackageIndex}/{totalPackages})...",
+                    Message = versionMessage,
                     PercentComplete = percent
                 });
                 // Versions already fetched in ProcessResponse, but this provides feedback
             }
 
+            var completedMessage = totalPackages == 1
+                ? _localizationService.GetString("Scanning.ScanCompletedSingle", "Scan completed. 1 package requires updates.")
+                : _localizationService.GetString("Scanning.ScanCompletedMulti", "Scan completed. {count} packages require updates.")
+                    .Replace("{count}", totalPackages.ToString());
+
             RaiseProgress(new ProgressUpdate
             {
                 Stage = ProgressStage.Complete,
-                Message = $"Scan completed. Found {totalPackages} packages requiring updates.",
+                Message = completedMessage,
                 PercentComplete = 100
             });
         }
         catch (Exception ex)
         {
-            _logger?.LogError($"Error during scan: {ex.Message}");
+            logger?.LogError($"Error during scan: {ex.Message}");
+            var errorMsg = _localizationService.GetString("Scanning.ErrorDuringScan", "Error during scan: {error}")
+                .Replace("{error}", ex.Message);
+            logger?.LogError(errorMsg);
             throw;
         }
 
         var values = results.Values.ToList();
 
-        if (_packageGroupService != null)
+        if (packageGroupService != null)
         {
             var ids = values.Select(v => v.PackageId).ToList();
-            await _packageGroupService.DetectAndSaveGroupsAsync(ids, path);
-            var knownGroups = await _packageGroupService.LoadGroupsAsync(path);
+            await packageGroupService.DetectAndSaveGroupsAsync(ids, path);
+            var knownGroups = await packageGroupService.LoadGroupsAsync(path);
             
             foreach (var pkg in values)
             {
-                pkg.GroupName = _packageGroupService.GetGroupName(pkg.PackageId, knownGroups);
+                pkg.GroupName = packageGroupService.GetGroupName(pkg.PackageId, knownGroups);
             }
         }
 
@@ -204,7 +210,7 @@ public class AuditorEngine
                     }
 
                     // Handle deprecated packages - extract alternative package if available
-                    if (reason == "Deprecated" && pkg.DeprecationReasons != null && pkg.DeprecationReasons.Any())
+                    if (reason == "Deprecated" && pkg.DeprecationReasons != null && pkg.DeprecationReasons.Count != 0)
                     {
                         // Try to extract alternative package from deprecation reasons
                         // Format is usually something like "Legacy", or can include alternative package info
@@ -230,7 +236,7 @@ public class AuditorEngine
         try
         {
             var url = $"https://api.nuget.org/v3-flatcontainer/{packageId.ToLowerInvariant()}/index.json";
-            var response = await _httpClient.GetAsync(url);
+            var response = await HttpClient.GetAsync(url);
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
@@ -243,9 +249,9 @@ public class AuditorEngine
         }
         catch (Exception ex)
         {
-            _logger?.LogWarning($"Could not fetch versions for {packageId}: {ex.Message}");
+            logger?.LogWarning($"Could not fetch versions for {packageId}: {ex.Message}");
         }
-        return new List<string>();
+        return [];
     }
 
     private List<string> FilterVersions(List<string> allVersions, string currentVersion)
@@ -272,7 +278,7 @@ public class AuditorEngine
                 continue;
 
             // Try to parse version
-            if (NuGet.Versioning.NuGetVersion.TryParse(versionString, out var nugetVersion))
+            if (NuGet.Versioning.NuGetVersion.TryParse(versionString, out var nugetVersion) && nugetVersion != null)
             {
                 // Only include versions newer than current
                 if (nugetVersion > currentNuGetVersion)
@@ -292,34 +298,36 @@ public class AuditorEngine
 
         // Check for common preview indicators
         var lowerVersion = version.ToLowerInvariant();
-        return lowerVersion.Contains("preview") ||
-               lowerVersion.Contains("alpha") ||
-               lowerVersion.Contains("beta") ||
-               lowerVersion.Contains("rc") ||
-               lowerVersion.Contains("pre") ||
-               lowerVersion.Contains("-");  // NuGet pre-release versions contain a hyphen
+        return lowerVersion.Contains("preview", StringComparison.OrdinalIgnoreCase) ||
+               lowerVersion.Contains("alpha", StringComparison.OrdinalIgnoreCase) ||
+               lowerVersion.Contains("beta", StringComparison.OrdinalIgnoreCase) ||
+               lowerVersion.Contains("rc", StringComparison.OrdinalIgnoreCase) ||
+               lowerVersion.Contains("pre", StringComparison.OrdinalIgnoreCase) ||
+               lowerVersion.Contains('-', StringComparison.OrdinalIgnoreCase);  // NuGet pre-release versions contain a hyphen
     }
 
     public async Task ApplyUpgradesAsync(string basePath, List<PackageUpgradeModel> packagesToUpgrade)
     {
-        _logger?.LogInformation($"Starting targeted upgrades in {basePath}");
+        logger?.LogInformation($"Starting targeted upgrades in {basePath}");
 
         var cpmPath = Path.Combine(basePath, "Directory.Packages.props");
         var usesCpm = File.Exists(cpmPath);
 
         // Filter selectable
         var applicablePackages = packagesToUpgrade.Where(pkg => !string.IsNullOrEmpty(pkg.SelectedVersion) && pkg.SelectedVersion != pkg.CurrentVersion && pkg.Projects.Any(p => p.IsSelectedForUpgrade)).ToList();
-        
+
         if (!applicablePackages.Any())
         {
-            RaiseProgress(new ProgressUpdate { Stage = ProgressStage.Complete, Message = "No upgrades selected to apply.", PercentComplete = 100 });
+            var noUpgradesMsg = _localizationService.GetString("Upgrading.NoUpgradesSelected", "No upgrades selected to apply.");
+            RaiseProgress(new ProgressUpdate { Stage = ProgressStage.Complete, Message = noUpgradesMsg, PercentComplete = 100 });
             return;
         }
 
         int failedCount = 0;
         try
         {
-            RaiseProgress(new ProgressUpdate { Stage = ProgressStage.ApplyingUpdates, Message = $"Starting to apply upgrades...", PercentComplete = 0 });
+            var startingMsg = _localizationService.GetString("Upgrading.StartingUpgrades", "Starting targeted upgrades...");
+            RaiseProgress(new ProgressUpdate { Stage = ProgressStage.ApplyingUpdates, Message = startingMsg, PercentComplete = 0 });
 
             // Group packages by GroupName (or uniquely if null)
             var groups = applicablePackages.GroupBy(p => p.GroupName ?? Guid.NewGuid().ToString()).ToList();
@@ -331,15 +339,20 @@ public class AuditorEngine
             {
                 currentGroupIndex++;
                 int percent = (int)((double)currentGroupIndex / totalGroups * 90);
-                
+
                 var packagesInGroup = group.ToList();
                 var groupDisplayName = !string.IsNullOrEmpty(packagesInGroup.First().GroupName) ? packagesInGroup.First().GroupName! : packagesInGroup.First().PackageId;
 
+                var groupMsg = _localizationService.GetString("Upgrading.ApplyingGroupUpgrade", "Applying upgrade for group '{group}' ({count} packages) ({current}/{total})")
+                    .Replace("{group}", groupDisplayName)
+                    .Replace("{count}", packagesInGroup.Count.ToString())
+                    .Replace("{current}", currentGroupIndex.ToString())
+                    .Replace("{total}", totalGroups.ToString());
 
                 RaiseProgress(new ProgressUpdate
                 {
                     Stage = ProgressStage.ApplyingUpdates,
-                    Message = $"Applying upgrade for group '{groupDisplayName}' ({packagesInGroup.Count} packages) ({currentGroupIndex}/{totalGroups})",
+                    Message = groupMsg,
                     PercentComplete = percent
                 });
 
@@ -347,28 +360,57 @@ public class AuditorEngine
                 {
                     // 1. Update all packages in CPM file
                     foreach (var pkg in packagesInGroup)
-                        _projectParser.UpdatePackageVersion(cpmPath, pkg.PackageId, pkg.SelectedVersion);
+                        projectParser.UpdatePackageVersion(cpmPath, pkg.PackageId, pkg.SelectedVersion);
 
                     // 2. Build once
                     var buildDir = Path.GetDirectoryName(cpmPath) ?? string.Empty;
-                    bool success = await _cliService.BuildAsync(buildDir);
+                    var buildResult = await cliService.BuildAsync(buildDir);
 
-                    if (success)
-                    {
-                        foreach (var pkg in packagesInGroup)
-                            await SaveAuditLogAsync(cpmPath, pkg.PackageId, pkg.CurrentVersion, pkg.SelectedVersion);
+                        if (buildResult.Success)
+                        {
+                            foreach (var pkg in packagesInGroup)
+                                await SaveAuditLogAsync(cpmPath, pkg.PackageId, pkg.CurrentVersion, pkg.SelectedVersion);
 
-                        RaiseProgress(new ProgressUpdate { Stage = ProgressStage.ApplyingUpdates, Message = $"✓ Group '{groupDisplayName}' updated successfully.", PercentComplete = percent });
-                    }
-                    else
-                    {
-                        // 3. Rollback
-                        foreach (var pkg in packagesInGroup)
-                            _projectParser.UpdatePackageVersion(cpmPath, pkg.PackageId, pkg.CurrentVersion);
-                        
-                        await _cliService.BuildAsync(buildDir); // Verify rollback
+                            var successMsg = _localizationService.GetString("Upgrading.GroupUpdateSuccess", "✓ Group '{group}' updated successfully.")
+                                .Replace("{group}", groupDisplayName);
+                            RaiseProgress(new ProgressUpdate { Stage = ProgressStage.ApplyingUpdates, Message = successMsg, PercentComplete = percent });
+                        }
+                        else
+                        {
+                            // 3. Rollback
+                            foreach (var pkg in packagesInGroup)
+                                projectParser.UpdatePackageVersion(cpmPath, pkg.PackageId, pkg.CurrentVersion);
 
-                        RaiseProgress(new ProgressUpdate { Stage = ProgressStage.ApplyingUpdates, Message = $"✗ Group '{groupDisplayName}' failed. Rolled back.", PercentComplete = percent, IsError = true });
+                            var errorMsg = buildResult.ErrorMessage ?? "Unknown build error";
+                            logger?.LogError($"Group '{groupDisplayName}' build failed: {errorMsg}");
+
+                            // Speichere fehlgeschlagenen Build im Log für jedes Paket der Gruppe
+                            foreach (var pkg in packagesInGroup)
+                                await SaveAuditLogAsync(cpmPath, pkg.PackageId, pkg.CurrentVersion, pkg.SelectedVersion, errorMsg);
+
+                            // Verify rollback - aber speichere auch den Rollback-Result
+                            var rollbackResult = await cliService.BuildAsync(buildDir);
+
+                        if (!rollbackResult.Success)
+                        {
+                            var rollbackErrorMsg = rollbackResult.ErrorMessage ?? "Unknown rollback error";
+                            var criticalMsg = _localizationService.GetString("Upgrading.GroupRollbackFailed", "CRITICAL: Rollback build also failed for group '{group}'. Rollback error: {error}")
+                                .Replace("{group}", groupDisplayName)
+                                .Replace("{error}", rollbackErrorMsg);
+                            logger?.LogError(criticalMsg);
+                            errorMsg = $"{errorMsg} (CRITICAL: Rollback also failed: {rollbackErrorMsg})";
+                        }
+                        else
+                        {
+                            var successMsg = _localizationService.GetString("Upgrading.GroupRollbackSuccess", "Rollback successful for group '{group}'.")
+                                .Replace("{group}", groupDisplayName);
+                            logger?.LogInformation(successMsg);
+                        }
+
+                        var failMsg = _localizationService.GetString("Upgrading.GroupUpdateFailed", "✗ Group '{group}' failed. Rolled back. {error}")
+                            .Replace("{group}", groupDisplayName)
+                            .Replace("{error}", errorMsg);
+                        RaiseProgress(new ProgressUpdate { Stage = ProgressStage.ApplyingUpdates, Message = failMsg, PercentComplete = percent, IsError = true });
 
                         // 4. Fallback prompt
                         if (OnGroupFallback != null && packagesInGroup.Count > 1)
@@ -376,7 +418,9 @@ public class AuditorEngine
                             bool userWantsFallback = await OnGroupFallback(groupDisplayName, packagesInGroup.Count);
                             if (userWantsFallback)
                             {
-                                RaiseProgress(new ProgressUpdate { Stage = ProgressStage.ApplyingUpdates, Message = $"Fallback: Applying updates for '{groupDisplayName}' individually...", PercentComplete = percent });
+                                var fallbackMsg = _localizationService.GetString("Upgrading.GroupFallbackMessage", "Fallback: Applying updates for '{group}' individually...")
+                                    .Replace("{group}", groupDisplayName);
+                                RaiseProgress(new ProgressUpdate { Stage = ProgressStage.ApplyingUpdates, Message = fallbackMsg, PercentComplete = percent });
                                 foreach (var pkg in packagesInGroup)
                                 {
                                     bool indSuccess = await TryUpdateAndVerifyAsync(cpmPath, pkg.PackageId, pkg.CurrentVersion, pkg.SelectedVersion, percent);
@@ -406,17 +450,22 @@ public class AuditorEngine
 
             if (failedCount > 0)
             {
-                RaiseProgress(new ProgressUpdate { Stage = ProgressStage.Failed, Message = $"Completed with failures. {failedCount} packages were rolled back.", PercentComplete = 100, IsError = true });
+                var failureMsg = _localizationService.GetString("Upgrading.CompletedWithFailures", "Completed with failures. {count} packages were rolled back.")
+                    .Replace("{count}", failedCount.ToString());
+                RaiseProgress(new ProgressUpdate { Stage = ProgressStage.Failed, Message = failureMsg, PercentComplete = 100, IsError = true });
             }
             else
             {
-                RaiseProgress(new ProgressUpdate { Stage = ProgressStage.Complete, Message = "All upgrades completed successfully!", PercentComplete = 100 });
+                var successMsg = _localizationService.GetString("Upgrading.CompletedSuccessfully", "All upgrades completed successfully!");
+                RaiseProgress(new ProgressUpdate { Stage = ProgressStage.Complete, Message = successMsg, PercentComplete = 100 });
             }
         }
         catch (Exception ex)
         {
-            _logger?.LogError($"Error during upgrade: {ex.Message}");
-            RaiseProgress(new ProgressUpdate { Stage = ProgressStage.Failed, Message = $"Critical error: {ex.Message}", PercentComplete = 100, IsError = true });
+            logger?.LogError($"Error during upgrade: {ex.Message}");
+            var criticalErrorMsg = _localizationService.GetString("Upgrading.CriticalError", "Critical error: {error}")
+                .Replace("{error}", ex.Message);
+            RaiseProgress(new ProgressUpdate { Stage = ProgressStage.Failed, Message = criticalErrorMsg, PercentComplete = 100, IsError = true });
             throw;
         }
     }
@@ -428,101 +477,141 @@ public class AuditorEngine
         try
         {
             // Apply update
+            var updateMsg = _localizationService.GetString("Upgrading.UpdatingPackage", "Updating {packageId} to {version}...")
+                .Replace("{packageId}", packageId)
+                .Replace("{version}", newVersion);
             RaiseProgress(new ProgressUpdate
             {
                 Stage = ProgressStage.ApplyingUpdates,
                 CurrentPackage = packageId,
-                Message = $"Updating {packageId} to {newVersion}...",
-                PercentComplete = currentPercent // Keep current progress
+                Message = updateMsg,
+                PercentComplete = currentPercent
             });
-            _projectParser.UpdatePackageVersion(projectOrPropsPath, packageId, newVersion);
+            projectParser.UpdatePackageVersion(projectOrPropsPath, packageId, newVersion);
 
             // Verify build
+            var verifyMsg = _localizationService.GetString("Upgrading.VerifyingBuild", "Verifying build for {packageId}...")
+                .Replace("{packageId}", packageId);
             RaiseProgress(new ProgressUpdate
             {
                 Stage = ProgressStage.Verifying,
                 CurrentPackage = packageId,
-                Message = $"Verifying build for {packageId}...",
-                PercentComplete = currentPercent // Keep current progress
+                Message = verifyMsg,
+                PercentComplete = currentPercent
             });
             var buildDir = Path.GetDirectoryName(projectOrPropsPath) ?? string.Empty;
-            var success = await _cliService.BuildAsync(buildDir);
+            var buildResult = await cliService.BuildAsync(buildDir);
 
-            if (success)
+            if (buildResult.Success)
             {
-                _logger?.LogInformation($"Success: {packageId} updated to {newVersion}.");
+                var verifiedMsg = _localizationService.GetString("Upgrading.BuildVerified", "✓ Build verified for {packageId} {version}")
+                    .Replace("{packageId}", packageId)
+                    .Replace("{version}", newVersion);
                 RaiseProgress(new ProgressUpdate
                 {
                     Stage = ProgressStage.Verifying,
                     CurrentPackage = packageId,
-                    Message = $"✓ Build verified for {packageId} {newVersion}",
-                    PercentComplete = currentPercent // Keep current progress
+                    Message = verifiedMsg,
+                    PercentComplete = currentPercent
                 });
                 await SaveAuditLogAsync(projectOrPropsPath, packageId, oldVersion, newVersion);
                 return true;
             }
             else
             {
-                _logger?.LogWarning($"Build failed after updating {packageId}. Rolling back to {oldVersion}.");
+                var errorMsg = buildResult.ErrorMessage ?? "Unknown build error";
+                logger?.LogWarning($"Build failed after updating {packageId}. Rolling back to {oldVersion}. Error: {errorMsg}");
+
+                // Speichere fehlgeschlagenen Build im Log
+                await SaveAuditLogAsync(projectOrPropsPath, packageId, oldVersion, newVersion, errorMsg);
+
+                var failedMsg = _localizationService.GetString("Upgrading.BuildVerifyFailed", "Build failed for {packageId}. Rolling back to {version}... Error: {error}")
+                    .Replace("{packageId}", packageId)
+                    .Replace("{version}", oldVersion)
+                    .Replace("{error}", errorMsg);
                 RaiseProgress(new ProgressUpdate
                 {
                     Stage = ProgressStage.Verifying,
                     CurrentPackage = packageId,
-                    Message = $"Build failed for {packageId}. Rolling back to {oldVersion}...",
-                    PercentComplete = currentPercent, // Keep current progress
+                    Message = failedMsg,
+                    PercentComplete = currentPercent,
                     IsError = true
                 });
+
                 // Rollback
-                _projectParser.UpdatePackageVersion(projectOrPropsPath, packageId, oldVersion);
-                // Verify rollback
-                await _cliService.BuildAsync(buildDir);
+                projectParser.UpdatePackageVersion(projectOrPropsPath, packageId, oldVersion);
+
+                // Verify rollback - aber speichere auch den Rollback-Result
+                var rollbackResult = await cliService.BuildAsync(buildDir);
+
+                if (!rollbackResult.Success)
+                {
+                    var rollbackErrorMsg = rollbackResult.ErrorMessage ?? "Unknown rollback error";
+                    var criticalMsg = _localizationService.GetString("Upgrading.PackageRollbackFailed", "CRITICAL: Rollback build also failed for {packageId}. Rollback error: {error}")
+                        .Replace("{packageId}", packageId)
+                        .Replace("{error}", rollbackErrorMsg);
+                    logger?.LogError(criticalMsg);
+                }
+                else
+                {
+                    var successMsg = _localizationService.GetString("Upgrading.PackageRollbackSuccess", "Rollback successful for {packageId}.")
+                        .Replace("{packageId}", packageId);
+                    logger?.LogInformation(successMsg);
+                }
+
                 return false;
             }
         }
         catch (Exception ex)
         {
-            _logger?.LogError($"Error updating {packageId}: {ex.Message}");
+            logger?.LogError($"Error updating {packageId}: {ex.Message}");
+
+            var errorUpdateMsg = _localizationService.GetString("Upgrading.ErrorUpdatingPackage", "Error updating {packageId}: {error}")
+                .Replace("{packageId}", packageId)
+                .Replace("{error}", ex.Message);
             RaiseProgress(new ProgressUpdate
             {
                 Stage = ProgressStage.Verifying,
                 CurrentPackage = packageId,
-                Message = $"Error: {ex.Message}",
+                Message = errorUpdateMsg,
                 PercentComplete = currentPercent,
                 IsError = true
             });
             // Attempt to restore original version if parser failed mid-save (unlikely but safe)
             if (oldVersion != null)
             {
-                try { _projectParser.UpdatePackageVersion(projectOrPropsPath, packageId, oldVersion); } catch { }
+                try { projectParser.UpdatePackageVersion(projectOrPropsPath, packageId, oldVersion); } catch { }
             }
             return false;
         }
     }
 
-    private async Task SaveAuditLogAsync(string projectOrPropsPath, string packageId, string oldVersion, string newVersion)
+    private async Task SaveAuditLogAsync(string projectOrPropsPath, string packageId, string? oldVersion, string newVersion, string? errorMessage = null)
     {
         var logDir = Path.GetDirectoryName(projectOrPropsPath) ?? string.Empty;
         var dateStr = DateTime.Now.ToString("yyMMdd");
         var logFileName = $"nugetAudit_{dateStr}.json";
         var logFilePath = Path.Combine(logDir, logFileName);
 
-        var logEntry = new
+        var logEntry = new AuditLogModel
         {
             Timestamp = DateTime.Now,
             PackageId = packageId,
             OldVersion = oldVersion,
             NewVersion = newVersion,
-            FileUpdated = Path.GetFileName(projectOrPropsPath)
+            FileUpdated = Path.GetFileName(projectOrPropsPath),
+            Status = string.IsNullOrEmpty(errorMessage) ? "Success" : "Failed",
+            ErrorMessage = errorMessage
         };
 
-        var logEntries = new List<object>();
+        var logEntries = new List<AuditLogModel>();
 
         if (File.Exists(logFilePath))
         {
             try
             {
                 var existingJson = await File.ReadAllTextAsync(logFilePath);
-                var existingLogs = System.Text.Json.JsonSerializer.Deserialize<List<object>>(existingJson);
+                var existingLogs = System.Text.Json.JsonSerializer.Deserialize<List<AuditLogModel>>(existingJson);
                 if (existingLogs != null)
                 {
                     logEntries.AddRange(existingLogs);
@@ -530,7 +619,7 @@ public class AuditorEngine
             }
             catch (Exception ex)
             {
-                _logger?.LogWarning($"Failed to read existing audit log {logFilePath}: {ex.Message}");
+                logger?.LogWarning($"Failed to read existing audit log {logFilePath}: {ex.Message}");
             }
         }
 
@@ -543,7 +632,7 @@ public class AuditorEngine
         }
         catch (Exception ex)
         {
-             _logger?.LogError($"Failed to write audit log {logFilePath}: {ex.Message}");
+             logger?.LogError($"Failed to write audit log {logFilePath}: {ex.Message}");
         }
     }
 }

@@ -17,7 +17,8 @@ namespace ProjectAuditor.Gui
                 .AddSingleton<ProjectAuditor.Core.Parsers.ProjectParser>()
                 .AddSingleton<ProjectAuditor.Core.Services.AuditorEngine>()
                 .AddSingleton<ProjectAuditor.Core.Services.PackageGroupService>()
-                .AddSingleton<ProjectAuditor.Core.Services.ISettingsService, ProjectAuditor.Core.Services.SettingsService>();
+                .AddSingleton<ProjectAuditor.Core.Services.ISettingsService, ProjectAuditor.Core.Services.SettingsService>()
+                .AddSingleton<ProjectAuditor.Core.Services.ILocalizationService, ProjectAuditor.Core.Services.LocalizationService>();
 
             // register root component and selector
             appBuilder.RootComponents.Add<App>("app");

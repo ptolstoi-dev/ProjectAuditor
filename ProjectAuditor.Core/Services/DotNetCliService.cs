@@ -7,14 +7,16 @@ namespace ProjectAuditor.Core.Services;
 public class DotNetCliService
 {
     private readonly ISettingsService _settingsService;
+    private readonly ILocalizationService _localizationService;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
 
-    public DotNetCliService(ISettingsService settingsService)
+    public DotNetCliService(ISettingsService settingsService, ILocalizationService? localizationService = null)
     {
         _settingsService = settingsService;
+        _localizationService = localizationService ?? new LocalizationService();
     }
 
     /// <summary>
@@ -142,8 +144,9 @@ public class DotNetCliService
 
     /// <summary>
     /// Builds the target project or solution to test if changes are valid.
+    /// Returns a BuildResult containing success status and detailed error messages.
     /// </summary>
-    public virtual async Task<bool> BuildAsync(string targetPath)
+    public virtual async Task<BuildResult> BuildAsync(string targetPath)
     {
         try
         {
@@ -159,12 +162,48 @@ public class DotNetCliService
 
             using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2)); // 2 minutes timeout
             using var process = Process.Start(processStartInfo);
-            if (process == null) return false;
+            if (process == null)
+            {
+                var errorMsg = _localizationService.GetString("Errors.CliProcessStartFailed", "Failed to start dotnet CLI process.");
+                return new BuildResult
+                {
+                    Success = false,
+                    ErrorMessage = errorMsg
+                };
+            }
+
+            // Lese StandardOutput und StandardError PARALLEL, um Deadlocks zu vermeiden
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
 
             try
             {
                 await process.WaitForExitAsync(cts.Token);
-                return process.ExitCode == 0;
+
+                // Warte auf beide Streams
+                var output = await outputTask;
+                var error = await errorTask;
+
+                if (process.ExitCode == 0)
+                {
+                    return new BuildResult { Success = true };
+                }
+                else
+                {
+                    // Kombiniere Output und Error für aussagekräftige Fehlermeldung
+                    var fullOutput = $"{output}\n{error}".Trim();
+
+                    // Extrahiere wichtige Fehlerinformationen
+                    var errorMessage = ExtractBuildErrorMessage(fullOutput);
+
+                    return new BuildResult
+                    {
+                        Success = false,
+                        ExitCode = process.ExitCode,
+                        StdError = error,
+                        ErrorMessage = errorMessage
+                    };
+                }
             }
             catch (OperationCanceledException)
             {
@@ -172,13 +211,68 @@ public class DotNetCliService
                 {
                     process.Kill(true);
                 }
-                return false;
+                var timeoutMsg = _localizationService.GetString("Errors.BuildTimeout", "Build operation timed out after 2 minutes.");
+                return new BuildResult
+                {
+                    Success = false,
+                    ErrorMessage = timeoutMsg
+                };
             }
         }
-        catch
+        catch (Exception ex)
         {
-            return false;
+            var errorMsg = _localizationService.GetString("Errors.UnexpectedBuildError", "Unexpected error during build: {error}")
+                .Replace("{error}", ex.Message);
+            return new BuildResult
+            {
+                Success = false,
+                ErrorMessage = errorMsg
+            };
         }
+    }
+
+    /// <summary>
+    /// Extrahiert die wichtigsten Fehlerinformationen aus der Build-Ausgabe.
+    /// Sucht nach Fehlerzeilen, die mit "error" beginnen.
+    /// </summary>
+    private string ExtractBuildErrorMessage(string fullOutput)
+    {
+        if (string.IsNullOrWhiteSpace(fullOutput))
+        {
+            return _localizationService.GetString("Errors.BuildFailedUnknown", "Build failed with unknown error.");
+        }
+
+        var lines = fullOutput.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+        var errorLines = new List<string>();
+
+        // Sammle alle Zeilen, die mit "error" beginnen
+        foreach (var line in lines)
+        {
+            if (line.Contains("error ", StringComparison.OrdinalIgnoreCase) || 
+                line.StartsWith("ERROR", StringComparison.OrdinalIgnoreCase))
+            {
+                errorLines.Add(line.Trim());
+            }
+        }
+
+        // Falls spezifische Fehler gefunden wurden, nutze diese
+        if (errorLines.Count > 0)
+        {
+            // Nimm die ersten 3 Fehler
+            var significantErrors = string.Join("\n", errorLines.Take(3));
+            var prefix = _localizationService.GetString("Errors.BuildFailedWithErrors", "Build failed with errors:");
+            return $"{prefix}\n{significantErrors}";
+        }
+
+        // Falls keine spezifischen Fehler gefunden, gib die letzten Zeilen zurück
+        var lastLines = lines.Where(l => !string.IsNullOrWhiteSpace(l)).TakeLast(5);
+        if (lastLines.Any())
+        {
+            var prefix = _localizationService.GetString("Errors.BuildFailed", "Build failed:");
+            return $"{prefix}\n{string.Join("\n", lastLines)}";
+        }
+
+        return _localizationService.GetString("Errors.BuildFailedUnknown", "Build failed with unknown error.");
     }
 
     /// <summary>
@@ -204,7 +298,16 @@ public class DotNetCliService
 
             try
             {
+                // Lese StandardOutput und StandardError PARALLEL, um Deadlocks zu vermeiden
+                var outputTask = process.StandardOutput.ReadToEndAsync();
+                var errorTask = process.StandardError.ReadToEndAsync();
+
                 await process.WaitForExitAsync(cts.Token);
+
+                // Warte auf beide Streams (obwohl wir sie nicht nutzen, verhindert dies Deadlocks)
+                _ = await outputTask;
+                _ = await errorTask;
+
                 return process.ExitCode == 0;
             }
             catch (OperationCanceledException)
