@@ -10,13 +10,15 @@ namespace ProjectAuditor.Tests;
 public class AuditorEngineTests
 {
     [Fact]
-    public async Task ApplyUpgradesAsync_HandlesBuildFailureAndRollsBack()
+    public async Task ApplyUpgradesAsync_SkipsUpdateWhenDependencyCheckFails()
     {
         // Arrange
         var mockCli = new Mock<DotNetCliService>(new Mock<ISettingsService>().Object, new Mock<ILocalizationService>().Object);
         var mockParser = new Mock<ProjectParser>();
         var mockLogger = new Mock<ILogger<AuditorEngine>>();
-        var engine = new AuditorEngine(mockCli.Object, mockParser.Object, null, mockLogger.Object);
+        var mockResolver = new Mock<INuGetDependencyResolver>();
+
+        var engine = new AuditorEngine(mockCli.Object, mockParser.Object, null, mockLogger.Object, null, mockResolver.Object);
         
         var tempFile = Path.GetTempFileName() + ".csproj";
         File.WriteAllText(tempFile, "<Project />");
@@ -35,13 +37,10 @@ public class AuditorEngineTests
             }
         };
 
-        // Mock build failure
-        mockCli.Setup(c => c.BuildAsync(It.IsAny<string>())).ReturnsAsync(new BuildResult 
-        { 
-            Success = false, 
-            ErrorMessage = "Test build failure" 
-        });
-        
+        // Mock dependency check failure for single updates (using non-CPM path)
+        mockResolver.Setup(r => r.AnalyzeUpdateAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+                    .ReturnsAsync(new ResolutionResult { IsSafe = false, ErrorMessage = "Test resolution failure" });
+
         // Track progress updates
         var updates = new List<ProgressUpdate>();
         engine.OnProgress += (u) => updates.Add(u);
@@ -50,13 +49,12 @@ public class AuditorEngineTests
         await engine.ApplyUpgradesAsync(Path.GetDirectoryName(tempFile)!, new List<PackageUpgradeModel> { upgrade });
 
         // Assert
-        // Should have called update twice: once for 2.0.0 and once for 1.0.0 (rollback)
-        mockParser.Verify(p => p.UpdatePackageVersion(tempFile, "TestPkg", "2.0.0"), Times.Once);
-        mockParser.Verify(p => p.UpdatePackageVersion(tempFile, "TestPkg", "1.0.0"), Times.Once);
+        // Should NEVER have called update because the dependency check failed pre-flight
+        mockParser.Verify(p => p.UpdatePackageVersion(tempFile, "TestPkg", "2.0.0"), Times.Never);
+        mockParser.Verify(p => p.UpdatePackageVersion(tempFile, "TestPkg", "1.0.0"), Times.Never);
         
-        // Should have a Failed stage in progress
-        Assert.Contains(updates, u => u.Stage == ProgressStage.Failed);
-        Assert.Contains(updates, u => u.IsError);
+        // Should have a Verifying stage with IsError = true
+        Assert.Contains(updates, u => u.Stage == ProgressStage.Verifying && u.IsError == true);
         
         // Cleanup
         if (File.Exists(tempFile)) File.Delete(tempFile);
@@ -68,7 +66,9 @@ public class AuditorEngineTests
         // Arrange
         var mockCli = new Mock<DotNetCliService>(new Mock<ISettingsService>().Object, new Mock<ILocalizationService>().Object);
         var mockParser = new Mock<ProjectParser>();
-        var engine = new AuditorEngine(mockCli.Object, mockParser.Object, null, null);
+        var mockResolver = new Mock<INuGetDependencyResolver>();
+
+        var engine = new AuditorEngine(mockCli.Object, mockParser.Object, null, null, null, mockResolver.Object);
         
         var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         Directory.CreateDirectory(tempDir);
@@ -89,12 +89,9 @@ public class AuditorEngineTests
             }
         };
 
-        // Build failure
-        mockCli.Setup(c => c.BuildAsync(It.IsAny<string>())).ReturnsAsync(new BuildResult 
-        { 
-            Success = false, 
-            ErrorMessage = "CRITICAL_BUILD_ERROR_TEXT" 
-        });
+        // Resolution failure
+        mockResolver.Setup(r => r.AnalyzeUpdateAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+                    .ReturnsAsync(new ResolutionResult { IsSafe = false, ErrorMessage = "CRITICAL_RESOLUTION_ERROR_TEXT" });
 
         // Act
         await engine.ApplyUpgradesAsync(tempDir, new List<PackageUpgradeModel> { upgrade });
@@ -107,7 +104,7 @@ public class AuditorEngineTests
         
         var json = File.ReadAllText(logFile);
         Assert.Contains("Failed", json);
-        Assert.Contains("CRITICAL_BUILD_ERROR_TEXT", json);
+        Assert.Contains("CRITICAL_RESOLUTION_ERROR_TEXT", json);
         Assert.Contains("ErrorPkg", json);
 
         // Cleanup

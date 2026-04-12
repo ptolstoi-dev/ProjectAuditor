@@ -1,0 +1,47 @@
+[
+  {
+    "Timestamp": "2026-04-12T19:10:31.4487472+02:00",
+    "PackageId": "Microsoft.Extensions.Logging",
+    "OldVersion": "10.0.4",
+    "NewVersion": "10.0.5",
+    "FileUpdated": "Directory.Packages.props",
+    "Status": "Success",
+    "ErrorMessage": null
+  },
+  {
+    "Timestamp": "2026-04-12T19:10:31.4547002+02:00",
+    "PackageId": "Microsoft.Extensions.Logging.Console",
+    "OldVersion": "10.0.4",
+    "NewVersion": "10.0.5",
+    "FileUpdated": "Directory.Packages.props",
+    "Status": "Success",
+    "ErrorMessage": null
+  },
+  {
+    "Timestamp": "2026-04-12T19:10:31.4574411+02:00",
+    "PackageId": "Microsoft.Extensions.Logging.Abstractions",
+    "OldVersion": "10.0.4",
+    "NewVersion": "10.0.5",
+    "FileUpdated": "Directory.Packages.props",
+    "Status": "Success",
+    "ErrorMessage": null
+  },
+  {
+    "Timestamp": "2026-04-12T19:10:31.4581971+02:00",
+    "PackageId": "Microsoft.Extensions.Logging.Debug",
+    "OldVersion": "10.0.4",
+    "NewVersion": "10.0.5",
+    "FileUpdated": "Directory.Packages.props",
+    "Status": "Success",
+    "ErrorMessage": null
+  },
+  {
+    "Timestamp": "2026-04-12T19:10:31.4915846+02:00",
+    "PackageId": "Microsoft.NET.Test.Sdk",
+    "OldVersion": "18.3.0",
+    "NewVersion": "18.4.0",
+    "FileUpdated": "Directory.Packages.props",
+    "Status": "Success",
+    "ErrorMessage": null
+  }
+]

@@ -3,7 +3,7 @@
 Ein Tool zur automatisierten Überprüfung und Aktualisierung von NuGet-Paketen in .NET-Projekten hinsichtlich Aktualität und Sicherheitslücken.
 
 ## Zweck
-Die Applikation überprüft eine gegebene .NET-Projektmappe (Solution) oder einzelne Projekte auf anfällige (vulnerable), veraltete (deprecated) oder aktualisierbare NuGet-Pakete (inklusive transitiver Abhängigkeiten). Sie versucht, Updates durchzuführen und prüft durch Erstellen (Build) des Projekts, ob das Update erfolgreich war. Falls nicht, werden alternative Versionen getestet oder abschließend ein Rollback zur Originalversion durchgeführt.
+Die Applikation überprüft eine gegebene .NET-Projektmappe (Solution) oder einzelne Projekte auf anfällige (vulnerable), veraltete (deprecated) oder aktualisierbare NuGet-Pakete (inklusive transitiver Abhängigkeiten). Bevor Updates in die Dateien geschrieben werden, analysiert der **DependencyResolver** den Abhängigkeitsgraphen (Pre-Flight Check) um Versionskonflikte frühzeitig zu erkennen. Dadurch werden fehlgeschlagene Builds und langwierige Rollbacks vermieden. Unterstützte Builds verifizieren im Anschluss die Integrität.
 
 ## Technologie-Stack & Architektur
 *   **Sprache:** C#
@@ -46,7 +46,7 @@ Die Applikation überprüft eine gegebene .NET-Projektmappe (Solution) oder einz
 
 ## Implementierung & Architektur Details
 
-* **`ProjectAuditor.Core`**: Beinhaltet die Logik. `ProjectParser.cs` analysiert und verändert die Projektdateien oder `Directory.Packages.props`. Die `AuditorEngine.cs` koordiniert die Updates mithilfe des `DotNetCliService.cs` (`dotnet list package --vulnerable`), initiiert anschließende Builds und veranlasst bei Fehlern den Rollback auf eine vorherige Version. Die Änderungen werden mit dem `AuditLogger.cs` protokolliert.
+* **`ProjectAuditor.Core`**: Beinhaltet die Logik. `ProjectParser.cs` analysiert und verändert die Projektdateien oder `Directory.Packages.props`. Vor Änderungen prüft der `NuGetDependencyResolver` (basierend auf der offiziellen NuGet-API) den Kompatibilitätsgraphen ab, sodass Fehlbildungen vermieden werden. Die `AuditorEngine.cs` koordiniert die Updates mithilfe des `DotNetCliService.cs` (`dotnet list package --vulnerable`), initiiert anschließende Build-Verifikationen. Die Änderungen werden mit dem `AuditLogger.cs` protokolliert.
 * **`ProjectAuditor.Cli`**: Das Global Tool mit Argument-Parsing. Integriert das Core-Backend.
 * **`ProjectAuditor.Gui`**: Die Desktop Blazor-Basis. Die UI sitzt in `Pages/Index.razor`, in der die Core-Services via Dependency Injection (DI) zur Verfügung stehen.
 

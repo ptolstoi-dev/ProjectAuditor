@@ -8,5 +8,16 @@
       "Microsoft.Extensions.Logging.Abstractions",
       "Microsoft.Extensions.Logging.Debug"
     ]
+  },
+  {
+    "GroupName": "NuGet",
+    "Prefix": "NuGet.",
+    "KnownPackages": [
+      "NuGet.Frameworks",
+      "NuGet.ProjectModel",
+      "NuGet.Protocol",
+      "NuGet.Resolver",
+      "NuGet.Versioning"
+    ]
   }
 ]

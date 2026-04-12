@@ -62,7 +62,10 @@ if (autoFix)
     logger = loggerFactory.CreateLogger<AuditorEngine>();
 }
 
-var engine = new AuditorEngine(cliService, projectParser, null, logger);
+var resolverLogger = autoFix ? loggerFactory.CreateLogger<NuGetDependencyResolver>() : NullLogger<NuGetDependencyResolver>.Instance;
+var dependencyResolver = new NuGetDependencyResolver(resolverLogger);
+
+var engine = new AuditorEngine(cliService, projectParser, null, logger, null, dependencyResolver);
 
 try
 {

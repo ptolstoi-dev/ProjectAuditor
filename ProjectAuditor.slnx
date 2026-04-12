@@ -1,4 +1,5 @@
 <Solution>
+  <Folder Name="/actions/" />
   <Folder Name="/doc/">
     <File Path="doc/CreateProject.md" />
     <File Path="doc/walkthrough.md" />

@@ -4,14 +4,32 @@ using Microsoft.Extensions.Logging;
 
 namespace ProjectAuditor.Core.Services;
 
-public class AuditorEngine(
-    DotNetCliService cliService,
-    ProjectParser projectParser,
-    PackageGroupService? packageGroupService = null,
-    ILogger<AuditorEngine>? logger = null,
-    ILocalizationService? localizationService = null)
+public class AuditorEngine
 {
-    private readonly ILocalizationService _localizationService = localizationService ?? new LocalizationService();
+    private readonly INuGetDependencyResolver? _dependencyResolver;
+
+    public AuditorEngine(
+        DotNetCliService cliService,
+        ProjectParser projectParser,
+        PackageGroupService? packageGroupService = null,
+        ILogger<AuditorEngine>? logger = null,
+        ILocalizationService? localizationService = null,
+        INuGetDependencyResolver? dependencyResolver = null)
+    {
+        this.cliService = cliService;
+        this.projectParser = projectParser;
+        this.packageGroupService = packageGroupService;
+        this.logger = logger;
+        _localizationService = localizationService ?? new LocalizationService();
+        _dependencyResolver = dependencyResolver;
+    }
+
+    private readonly DotNetCliService cliService;
+    private readonly ProjectParser projectParser;
+    private readonly PackageGroupService? packageGroupService;
+    private readonly ILogger<AuditorEngine>? logger;
+    private readonly ILocalizationService _localizationService;
+
 
     private static readonly HttpClient HttpClient = new();
 
@@ -358,56 +376,44 @@ public class AuditorEngine(
 
                 if (usesCpm)
                 {
-                    // 1. Update all packages in CPM file
-                    foreach (var pkg in packagesInGroup)
-                        projectParser.UpdatePackageVersion(cpmPath, pkg.PackageId, pkg.SelectedVersion);
+                    bool canSafelyUpdate = true;
+                    string? errorMsg = null;
 
-                    // 2. Build once
-                    var buildDir = Path.GetDirectoryName(cpmPath) ?? string.Empty;
-                    var buildResult = await cliService.BuildAsync(buildDir);
+                    if (_dependencyResolver != null)
+                    {
+                        var resolveMsg = _localizationService.GetString("Upgrading.ResolvingDependencies", "Resolving dependencies for group '{group}'...")
+                            .Replace("{group}", groupDisplayName);
+                            
+                        RaiseProgress(new ProgressUpdate { Stage = ProgressStage.ApplyingUpdates, Message = resolveMsg, PercentComplete = percent });
+                        
+                        var resolutionResult = await _dependencyResolver.AnalyzeGroupUpdateAsync(cpmPath, packagesInGroup);
+                        canSafelyUpdate = resolutionResult.IsSafe;
+                        errorMsg = resolutionResult.ErrorMessage;
+                    }
 
-                        if (buildResult.Success)
-                        {
-                            foreach (var pkg in packagesInGroup)
-                                await SaveAuditLogAsync(cpmPath, pkg.PackageId, pkg.CurrentVersion, pkg.SelectedVersion);
+                    if (canSafelyUpdate)
+                    {
+                        // 1. Update all packages in CPM file since safe
+                        foreach (var pkg in packagesInGroup)
+                            projectParser.UpdatePackageVersion(cpmPath, pkg.PackageId, pkg.SelectedVersion);
 
-                            var successMsg = _localizationService.GetString("Upgrading.GroupUpdateSuccess", "✓ Group '{group}' updated successfully.")
-                                .Replace("{group}", groupDisplayName);
-                            RaiseProgress(new ProgressUpdate { Stage = ProgressStage.ApplyingUpdates, Message = successMsg, PercentComplete = percent });
-                        }
-                        else
-                        {
-                            // 3. Rollback
-                            foreach (var pkg in packagesInGroup)
-                                projectParser.UpdatePackageVersion(cpmPath, pkg.PackageId, pkg.CurrentVersion);
+                        foreach (var pkg in packagesInGroup)
+                            await SaveAuditLogAsync(cpmPath, pkg.PackageId, pkg.CurrentVersion, pkg.SelectedVersion);
 
-                            var errorMsg = buildResult.ErrorMessage ?? "Unknown build error";
-                            logger?.LogError($"Group '{groupDisplayName}' build failed: {errorMsg}");
+                        var successMsg = _localizationService.GetString("Upgrading.GroupUpdateSuccess", "✓ Group '{group}' updated successfully.")
+                            .Replace("{group}", groupDisplayName);
+                        RaiseProgress(new ProgressUpdate { Stage = ProgressStage.ApplyingUpdates, Message = successMsg, PercentComplete = percent });
+                    }
+                    else
+                    {
+                        errorMsg ??= "Dependency resolution failed";
+                        logger?.LogError($"Group '{groupDisplayName}' update rejected by resolver: {errorMsg}");
 
-                            // Speichere fehlgeschlagenen Build im Log für jedes Paket der Gruppe
-                            foreach (var pkg in packagesInGroup)
-                                await SaveAuditLogAsync(cpmPath, pkg.PackageId, pkg.CurrentVersion, pkg.SelectedVersion, errorMsg);
+                        // Save failed audit log
+                        foreach (var pkg in packagesInGroup)
+                            await SaveAuditLogAsync(cpmPath, pkg.PackageId, pkg.CurrentVersion, pkg.SelectedVersion, errorMsg);
 
-                            // Verify rollback - aber speichere auch den Rollback-Result
-                            var rollbackResult = await cliService.BuildAsync(buildDir);
-
-                        if (!rollbackResult.Success)
-                        {
-                            var rollbackErrorMsg = rollbackResult.ErrorMessage ?? "Unknown rollback error";
-                            var criticalMsg = _localizationService.GetString("Upgrading.GroupRollbackFailed", "CRITICAL: Rollback build also failed for group '{group}'. Rollback error: {error}")
-                                .Replace("{group}", groupDisplayName)
-                                .Replace("{error}", rollbackErrorMsg);
-                            logger?.LogError(criticalMsg);
-                            errorMsg = $"{errorMsg} (CRITICAL: Rollback also failed: {rollbackErrorMsg})";
-                        }
-                        else
-                        {
-                            var successMsg = _localizationService.GetString("Upgrading.GroupRollbackSuccess", "Rollback successful for group '{group}'.")
-                                .Replace("{group}", groupDisplayName);
-                            logger?.LogInformation(successMsg);
-                        }
-
-                        var failMsg = _localizationService.GetString("Upgrading.GroupUpdateFailed", "✗ Group '{group}' failed. Rolled back. {error}")
+                        var failMsg = _localizationService.GetString("Upgrading.GroupUpdateFailed", "✗ Group '{group}' failed dependency checks. {error}")
                             .Replace("{group}", groupDisplayName)
                             .Replace("{error}", errorMsg);
                         RaiseProgress(new ProgressUpdate { Stage = ProgressStage.ApplyingUpdates, Message = failMsg, PercentComplete = percent, IsError = true });
@@ -476,35 +482,42 @@ public class AuditorEngine(
 
         try
         {
-            // Apply update
-            var updateMsg = _localizationService.GetString("Upgrading.UpdatingPackage", "Updating {packageId} to {version}...")
-                .Replace("{packageId}", packageId)
-                .Replace("{version}", newVersion);
-            RaiseProgress(new ProgressUpdate
-            {
-                Stage = ProgressStage.ApplyingUpdates,
-                CurrentPackage = packageId,
-                Message = updateMsg,
-                PercentComplete = currentPercent
-            });
-            projectParser.UpdatePackageVersion(projectOrPropsPath, packageId, newVersion);
+            bool canSafelyUpdate = true;
+            string? errorMsg = null;
 
-            // Verify build
-            var verifyMsg = _localizationService.GetString("Upgrading.VerifyingBuild", "Verifying build for {packageId}...")
-                .Replace("{packageId}", packageId);
-            RaiseProgress(new ProgressUpdate
+            if (_dependencyResolver != null)
             {
-                Stage = ProgressStage.Verifying,
-                CurrentPackage = packageId,
-                Message = verifyMsg,
-                PercentComplete = currentPercent
-            });
-            var buildDir = Path.GetDirectoryName(projectOrPropsPath) ?? string.Empty;
-            var buildResult = await cliService.BuildAsync(buildDir);
+                var verifyMsg = _localizationService.GetString("Upgrading.ResolvingDependencies", "Resolving dependencies for {packageId}...")
+                    .Replace("{packageId}", packageId);
+                RaiseProgress(new ProgressUpdate
+                {
+                    Stage = ProgressStage.Verifying,
+                    CurrentPackage = packageId,
+                    Message = verifyMsg,
+                    PercentComplete = currentPercent
+                });
+                
+                var resolution = await _dependencyResolver.AnalyzeUpdateAsync(projectOrPropsPath, packageId, newVersion);
+                canSafelyUpdate = resolution.IsSafe;
+                errorMsg = resolution.ErrorMessage;
+            }
 
-            if (buildResult.Success)
+            if (canSafelyUpdate)
             {
-                var verifiedMsg = _localizationService.GetString("Upgrading.BuildVerified", "✓ Build verified for {packageId} {version}")
+                // Apply update
+                var updateMsg = _localizationService.GetString("Upgrading.UpdatingPackage", "Updating {packageId} to {version}...")
+                    .Replace("{packageId}", packageId)
+                    .Replace("{version}", newVersion);
+                RaiseProgress(new ProgressUpdate
+                {
+                    Stage = ProgressStage.ApplyingUpdates,
+                    CurrentPackage = packageId,
+                    Message = updateMsg,
+                    PercentComplete = currentPercent
+                });
+                projectParser.UpdatePackageVersion(projectOrPropsPath, packageId, newVersion);
+
+                var verifiedMsg = _localizationService.GetString("Upgrading.BuildVerified", "✓ Integrity verified for {packageId} {version}")
                     .Replace("{packageId}", packageId)
                     .Replace("{version}", newVersion);
                 RaiseProgress(new ProgressUpdate
@@ -519,15 +532,13 @@ public class AuditorEngine(
             }
             else
             {
-                var errorMsg = buildResult.ErrorMessage ?? "Unknown build error";
-                logger?.LogWarning($"Build failed after updating {packageId}. Rolling back to {oldVersion}. Error: {errorMsg}");
+                errorMsg ??= "Dependency resolution failed";
+                logger?.LogWarning($"Update rejected by resolver: {packageId}. Error: {errorMsg}");
 
-                // Speichere fehlgeschlagenen Build im Log
                 await SaveAuditLogAsync(projectOrPropsPath, packageId, oldVersion, newVersion, errorMsg);
 
-                var failedMsg = _localizationService.GetString("Upgrading.BuildVerifyFailed", "Build failed for {packageId}. Rolling back to {version}... Error: {error}")
+                var failedMsg = _localizationService.GetString("Upgrading.BuildVerifyFailed", "Dependency check failed for {packageId}. Skipping update... Error: {error}")
                     .Replace("{packageId}", packageId)
-                    .Replace("{version}", oldVersion)
                     .Replace("{error}", errorMsg);
                 RaiseProgress(new ProgressUpdate
                 {
@@ -537,27 +548,6 @@ public class AuditorEngine(
                     PercentComplete = currentPercent,
                     IsError = true
                 });
-
-                // Rollback
-                projectParser.UpdatePackageVersion(projectOrPropsPath, packageId, oldVersion);
-
-                // Verify rollback - aber speichere auch den Rollback-Result
-                var rollbackResult = await cliService.BuildAsync(buildDir);
-
-                if (!rollbackResult.Success)
-                {
-                    var rollbackErrorMsg = rollbackResult.ErrorMessage ?? "Unknown rollback error";
-                    var criticalMsg = _localizationService.GetString("Upgrading.PackageRollbackFailed", "CRITICAL: Rollback build also failed for {packageId}. Rollback error: {error}")
-                        .Replace("{packageId}", packageId)
-                        .Replace("{error}", rollbackErrorMsg);
-                    logger?.LogError(criticalMsg);
-                }
-                else
-                {
-                    var successMsg = _localizationService.GetString("Upgrading.PackageRollbackSuccess", "Rollback successful for {packageId}.")
-                        .Replace("{packageId}", packageId);
-                    logger?.LogInformation(successMsg);
-                }
 
                 return false;
             }
